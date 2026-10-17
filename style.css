@@ -113,3 +113,22 @@ td.num, th.num { text-align: right; }
   main { padding: 18px 16px; }
   .hide-sm { display: none; }
 }
+
+/* Login e sincronização */
+.sidebar { display: flex; flex-direction: column; }
+.side-foot { margin-top: auto; padding: 16px 8px 0; font-size: 12px; }
+.sync.ok { color: #69db7c; }
+.sync.pending { color: #ffc078; }
+.sync.error { color: #ff8787; }
+#userBox { margin-top: 6px; color: var(--side-text); word-break: break-all; }
+.linkbtn { background: none; border: 0; color: #fff; text-decoration: underline; cursor: pointer; font-size: 12px; padding: 0; }
+.login { position: fixed; inset: 0; background: var(--bg); display: grid; place-items: center; padding: 16px; z-index: 70; }
+.login[hidden] { display: none; }
+.login-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; width: 100%; max-width: 360px; }
+.login-card h2 { margin: 6px 0 16px; }
+.brand.dark { color: var(--text); padding: 0; }
+.login-err { color: var(--bad); font-size: 13px; min-height: 18px; margin-top: 8px; }
+@media (max-width: 800px) {
+  .side-foot { padding: 8px 0 0; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  #userBox { margin-top: 0; }
+}

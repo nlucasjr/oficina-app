@@ -30,7 +30,8 @@ function loadDB() {
 let db = loadDB();
 function save() {
   try { localStorage.setItem(DB_KEY, JSON.stringify(db)); }
-  catch (e) { alert('Não foi possível salvar (armazenamento cheio?). Faça um backup e remova a logo se for muito grande.'); }
+  catch (e) { if (!window.cloud?.on) alert('Não foi possível salvar (armazenamento cheio?). Faça um backup e remova a logo se for muito grande.'); }
+  window.cloud?.schedule();
 }
 
 // ---------- utilidades ----------
@@ -543,7 +544,7 @@ function salvarOrc(silent) {
   d.itens = d.itens.map(it => ({ ...it, qtd: num(it.qtd), valor: num(it.valor), custo: num(it.custo) }));
   d.desconto = num(d.desconto); d.km = d.km ? num(d.km) : '';
   delete d._q;
-  if (!d.id) { d.id = uid(); d.numero = db.seq++; db.orcamentos.push(structuredClone(d)); }
+  if (!d.id) { d.id = uid(); d.numero = Math.max(0, ...db.orcamentos.map(x => x.numero || 0)) + 1; db.orcamentos.push(structuredClone(d)); }
   else { const i = db.orcamentos.findIndex(o => o.id === d.id); db.orcamentos[i] = structuredClone(d); }
   const v = getVeiculo(d.veiculoId);
   if (v && d.km && num(d.km) > num(v.km)) v.km = num(d.km);
@@ -793,4 +794,4 @@ function render() {
 }
 window.addEventListener('hashchange', () => { render(); window.scrollTo(0, 0); });
 bindEditor();
-render();
+// render() inicial é chamado por cloud.js depois do login

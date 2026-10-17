@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="style.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.min.js"></script>
 </head>
 <body>
 <div class="layout">
@@ -20,11 +21,27 @@
       <a href="#pecas" data-r="pecas">Peças e materiais</a>
       <a href="#config" data-r="config">Configurações</a>
     </nav>
+    <div class="side-foot">
+      <div id="syncStatus" class="sync"></div>
+      <div id="userBox" hidden><span id="userEmail"></span> <button id="logoutBtn" class="linkbtn">Sair</button></div>
+    </div>
   </aside>
   <main id="main"></main>
 </div>
+<div id="login" class="login" hidden>
+  <form id="loginForm" class="login-card">
+    <div class="brand dark"><span class="logo-dot">⚙</span>Oficina</div>
+    <h2>Entrar</h2>
+    <label>E-mail</label><input id="loginEmail" type="email" autocomplete="username" required>
+    <label style="margin-top:12px">Senha</label><input id="loginPass" type="password" autocomplete="current-password" required>
+    <div id="loginErr" class="login-err"></div>
+    <button class="btn primary" style="width:100%;justify-content:center;margin-top:8px">Entrar</button>
+  </form>
+</div>
 <div id="modal" class="modal"></div>
 <div id="toast" class="toast"></div>
+<script src="config.js"></script>
 <script src="app.js"></script>
+<script src="cloud.js"></script>
 </body>
 </html>
