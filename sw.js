@@ -4,7 +4,7 @@
    - Bibliotecas de CDN (PDF e Supabase): ficam guardadas depois do primeiro uso.
    - Supabase (login e dados): nunca passa pelo cache, vai sempre direto para a rede.
    Ao mudar a lista de arquivos ou as versões das bibliotecas, aumente o número em CACHE. */
-const CACHE = 'oficina-v1';
+const CACHE = 'oficina-v2';
 
 const SHELL = [
   './', 'index.html', 'style.css', 'config.js', 'app.js', 'cloud.js',

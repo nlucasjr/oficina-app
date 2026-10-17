@@ -159,8 +159,12 @@ function fieldHTML(f, val) {
   } else if (f.type === "textarea") {
     input = `<textarea name="${f.k}" rows="3">${esc(v)}</textarea>`;
   } else {
-    const step = f.type === "number" ? `step="${f.step || "any"}" min="0"` : "";
-    input = `<input name="${f.k}" type="${f.type || "text"}" value="${esc(v)}" ${step} ${req} placeholder="${esc(f.ph || "")}">`;
+    const step =
+      f.type === "number"
+        ? `step="${f.step || "any"}" min="0" inputmode="${f.step === "1" ? "numeric" : "decimal"}"`
+        : "";
+    const extra = f.type === "tel" ? 'inputmode="tel" autocomplete="tel"' : "";
+    input = `<input name="${f.k}" type="${f.type || "text"}" value="${esc(v)}" ${step} ${extra} ${req} placeholder="${esc(f.ph || "")}">`;
   }
   return `<div class="${cls}"><label>${esc(f.label)}${f.required ? " *" : ""}</label>${input}</div>`;
 }
@@ -201,6 +205,7 @@ const clienteFields = () => [
   {
     k: "telefone",
     label: "WhatsApp / Telefone",
+    type: "tel",
     required: true,
     ph: "(11) 98888-7777",
   },
@@ -386,15 +391,15 @@ function orcRows(list, showVeic = true) {
       const c = getCliente(o.clienteId),
         v = getVeiculo(o.veiculoId);
       return `<tr class="click" data-href="#orcamento/${o.id}">
-      <td><b>#${pad(o.numero)}</b></td><td>${fmtDate(o.data)}</td>
-      <td>${esc(c?.nome || "—")}</td>
-      ${showVeic ? `<td class="hide-sm">${plate(v?.placa)} ${esc(veiculoLabel(v))}</td>` : ""}
-      <td>${badge(o.status)}</td><td class="num"><b>${brl(totais(o).total)}</b></td></tr>`;
+      <td class="c1"><b>#${pad(o.numero)}</b></td><td class="c2 o9 sub">${fmtDate(o.data)}</td>
+      <td class="c1 strong">${esc(c?.nome || "—")}</td>
+      ${showVeic ? `<td class="c1 sub">${plate(v?.placa)} ${esc(veiculoLabel(v))}</td>` : ""}
+      <td class="c2">${badge(o.status)}</td><td class="num c2"><b>${brl(totais(o).total)}</b></td></tr>`;
     })
     .join("");
 }
 const orcHead = (showVeic = true) =>
-  `<tr><th>Nº</th><th>Data</th><th>Cliente</th>${showVeic ? '<th class="hide-sm">Veículo</th>' : ""}<th>Status</th><th class="num">Total</th></tr>`;
+  `<tr><th>Nº</th><th>Data</th><th>Cliente</th>${showVeic ? "<th>Veículo</th>" : ""}<th>Status</th><th class="num">Total</th></tr>`;
 
 const views = {
   painel() {
@@ -414,7 +419,7 @@ const views = {
         <div class="stat"><div class="l">Aprovado/concluído no mês</div><div class="v">${brl(fat)}</div></div>
         <div class="stat"><div class="l">Lucro estimado no mês</div><div class="v">${brl(lucro)}</div></div>
       </div>
-      <div class="card"><h2>Últimos orçamentos</h2><div class="table-wrap"><table>
+      <div class="card"><h2>Últimos orçamentos</h2><div class="table-wrap"><table class="list">
         <thead>${orcHead()}</thead><tbody>${orcRows(
           db.orcamentos
             .slice()
@@ -446,7 +451,7 @@ const views = {
             )
             .join("")}</select>
       </div>
-      <div class="card"><div class="table-wrap"><table><thead>${orcHead()}</thead><tbody>${orcRows(list)}</tbody></table></div></div>`;
+      <div class="card"><div class="table-wrap"><table class="list"><thead>${orcHead()}</thead><tbody>${orcRows(list)}</tbody></table></div></div>`;
   },
 
   clientes(_, q) {
@@ -459,21 +464,21 @@ const views = {
       .sort((a, b) => a.nome.localeCompare(b.nome));
     return `<div class="page-head"><h1>Clientes</h1><button class="btn primary" data-act="novoCliente">+ Novo cliente</button></div>
       <div class="toolbar"><input id="fBusca" placeholder="Buscar nome, telefone, CPF..." value="${esc(q.q || "")}"></div>
-      <div class="card"><div class="table-wrap"><table>
-      <thead><tr><th>Nome</th><th>WhatsApp</th><th class="hide-sm">Veículos</th><th class="hide-sm">Orçamentos</th></tr></thead><tbody>
+      <div class="card"><div class="table-wrap"><table class="list">
+      <thead><tr><th>Nome</th><th>WhatsApp</th><th>Veículos</th><th class="num">Orçamentos</th></tr></thead><tbody>
       ${
         list.length
           ? list
               .map(
                 (c) => `<tr class="click" data-href="#cliente/${c.id}">
-        <td><b>${esc(c.nome)}</b></td><td>${esc(c.telefone)}</td>
-        <td class="hide-sm">${
+        <td class="c1 strong">${esc(c.nome)}</td><td class="c1 sub">${esc(c.telefone)}</td>
+        <td class="c1">${
           db.veiculos
             .filter((v) => v.clienteId === c.id)
             .map((v) => plate(v.placa))
-            .join(" ") || "—"
+            .join(" ") || '<span class="muted">—</span>'
         }</td>
-        <td class="hide-sm">${db.orcamentos.filter((o) => o.clienteId === c.id).length}</td></tr>`,
+        <td class="num c2 sub" data-l="Orçamentos">${db.orcamentos.filter((o) => o.clienteId === c.id).length}</td></tr>`,
               )
               .join("")
           : `<tr><td colspan="4" class="empty">Nenhum cliente cadastrado</td></tr>`
@@ -499,16 +504,16 @@ const views = {
       </div></div>
       <div class="card"><div class="page-head" style="margin-bottom:8px"><h2>Veículos</h2>
         <button class="btn sm" data-act="novoVeiculo" data-cliente="${id}">+ Adicionar veículo</button></div>
-        <div class="table-wrap"><table><thead><tr><th>Placa</th><th>Veículo</th><th class="hide-sm">Km</th><th></th></tr></thead><tbody>
+        <div class="table-wrap"><table class="list"><thead><tr><th>Placa</th><th>Veículo</th><th>Km</th><th></th></tr></thead><tbody>
         ${
           veics.length
             ? veics
                 .map(
                   (
                     v,
-                  ) => `<tr class="click" data-href="#veiculo/${v.id}"><td>${plate(v.placa)}</td>
-          <td>${esc(veiculoLabel(v))}</td><td class="hide-sm">${v.km ? num(v.km).toLocaleString("pt-BR") : "—"}</td>
-          <td class="num"><a class="btn sm" href="#orcamento/novo?cliente=${id}&veiculo=${v.id}" data-stop>Orçar</a></td></tr>`,
+                  ) => `<tr class="click" data-href="#veiculo/${v.id}"><td class="c2">${plate(v.placa)}</td>
+          <td class="c1 strong">${esc(veiculoLabel(v)) || "—"}</td><td class="c1 sub" data-l="Km">${v.km ? num(v.km).toLocaleString("pt-BR") : "—"}</td>
+          <td class="num c2"><a class="btn sm" href="#orcamento/novo?cliente=${id}&veiculo=${v.id}" data-stop>Orçar</a></td></tr>`,
                 )
                 .join("")
             : `<tr><td colspan="4" class="empty">Nenhum veículo</td></tr>`
@@ -516,7 +521,7 @@ const views = {
         </tbody></table></div></div>
       <div class="card"><div class="page-head" style="margin-bottom:8px"><h2>Orçamentos</h2>
         <a class="btn sm" href="#orcamento/novo?cliente=${id}">+ Novo orçamento</a></div>
-        <div class="table-wrap"><table><thead>${orcHead()}</thead><tbody>${orcRows(orcs)}</tbody></table></div></div>`;
+        <div class="table-wrap"><table class="list"><thead>${orcHead()}</thead><tbody>${orcRows(orcs)}</tbody></table></div></div>`;
   },
 
   veiculos(_, q) {
@@ -532,8 +537,8 @@ const views = {
       .sort((a, b) => a.placa.localeCompare(b.placa));
     return `<div class="page-head"><h1>Veículos</h1><button class="btn primary" data-act="novoVeiculo">+ Novo veículo</button></div>
       <div class="toolbar"><input id="fBusca" placeholder="Buscar placa, modelo, cliente..." value="${esc(q.q || "")}"></div>
-      <div class="card"><div class="table-wrap"><table>
-      <thead><tr><th>Placa</th><th>Veículo</th><th>Cliente</th><th class="hide-sm">Último serviço</th></tr></thead><tbody>
+      <div class="card"><div class="table-wrap"><table class="list">
+      <thead><tr><th>Placa</th><th>Veículo</th><th>Cliente</th><th>Último serviço</th></tr></thead><tbody>
       ${
         list.length
           ? list
@@ -543,8 +548,8 @@ const views = {
                   .sort((a, b) =>
                     (b.data || "").localeCompare(a.data || ""),
                   )[0];
-                return `<tr class="click" data-href="#veiculo/${v.id}"><td>${plate(v.placa)}</td><td>${esc(veiculoLabel(v))}</td>
-          <td>${esc(getCliente(v.clienteId)?.nome || "—")}</td><td class="hide-sm">${ult ? fmtDate(ult.data) : "—"}</td></tr>`;
+                return `<tr class="click" data-href="#veiculo/${v.id}"><td class="c2">${plate(v.placa)}</td><td class="c1 strong">${esc(veiculoLabel(v)) || "—"}</td>
+          <td class="c1 sub">${esc(getCliente(v.clienteId)?.nome || "—")}</td><td class="c1 sub" data-l="Último serviço">${ult ? fmtDate(ult.data) : "—"}</td></tr>`;
               })
               .join("")
           : `<tr><td colspan="4" class="empty">Nenhum veículo cadastrado</td></tr>`
@@ -607,8 +612,8 @@ const views = {
       .sort((a, b) => a.nome.localeCompare(b.nome));
     return `<div class="page-head"><h1>Peças e materiais</h1><button class="btn primary" data-act="novaPeca">+ Nova peça</button></div>
       <div class="toolbar"><input id="fBusca" placeholder="Buscar descrição, código, marca..." value="${esc(q.q || "")}"></div>
-      <div class="card"><div class="table-wrap"><table>
-      <thead><tr><th>Descrição</th><th class="hide-sm">Código</th><th class="hide-sm">Un.</th><th class="num">Custo</th><th class="num">Venda</th><th class="num hide-sm">Margem</th><th class="num hide-sm">Estoque</th><th></th></tr></thead><tbody>
+      <div class="card"><div class="table-wrap"><table class="list">
+      <thead><tr><th>Descrição</th><th>Código</th><th>Un.</th><th class="num">Custo</th><th class="num">Venda</th><th class="num">Margem</th><th class="num">Estoque</th><th></th></tr></thead><tbody>
       ${
         list.length
           ? list
@@ -616,13 +621,13 @@ const views = {
                 const mg = num(p.custo)
                   ? ((num(p.preco) / num(p.custo) - 1) * 100).toFixed(0) + "%"
                   : "—";
-                return `<tr><td><b>${esc(p.nome)}</b>${p.marca ? `<div class="muted" style="font-size:13px">${esc(p.marca)}</div>` : ""}</td>
-          <td class="hide-sm">${esc(p.codigo) || "—"}</td><td class="hide-sm">${esc(p.unidade || "un")}</td>
-          <td class="num">${brl(p.custo)}</td><td class="num"><b>${brl(p.preco)}</b></td><td class="num hide-sm">${mg}</td>
-          <td class="num hide-sm">${p.estoque !== undefined && p.estoque !== "" ? num(p.estoque) : "—"}</td>
-          <td class="num"><div class="actions" style="justify-content:flex-end">
+                return `<tr><td class="c1"><b>${esc(p.nome)}</b>${p.marca ? `<div class="muted" style="font-size:13px">${esc(p.marca)}</div>` : ""}</td>
+          <td class="c1 sub" data-l="Cód.">${esc(p.codigo) || "—"}</td><td class="hide-sm">${esc(p.unidade || "un")}</td>
+          <td class="num c2 sub" data-l="Custo">${brl(p.custo)}</td><td class="num c2 o-1"><b>${brl(p.preco)}</b></td><td class="num hide-sm">${mg}</td>
+          <td class="num c2 sub" data-l="Estoque">${p.estoque !== undefined && p.estoque !== "" ? num(p.estoque) : "—"}</td>
+          <td class="num row-actions"><div class="actions" style="justify-content:flex-end">
             <button class="btn sm" data-act="editPeca" data-id="${p.id}">Editar</button>
-            <button class="btn sm danger" data-act="del" data-kind="peca" data-id="${p.id}">✕</button></div></td></tr>`;
+            <button class="btn sm danger" data-act="del" data-kind="peca" data-id="${p.id}" aria-label="Excluir">✕</button></div></td></tr>`;
               })
               .join("")
           : `<tr><td colspan="8" class="empty">Nenhuma peça cadastrada</td></tr>`
@@ -637,7 +642,7 @@ const views = {
       <form id="cfgForm"><div class="grid">
         ${fieldHTML({ k: "nome", label: "Nome da oficina", required: true, full: true }, c.nome)}
         ${fieldHTML({ k: "cnpj", label: "CNPJ" }, c.cnpj)}
-        ${fieldHTML({ k: "telefone", label: "Telefone / WhatsApp" }, c.telefone)}
+        ${fieldHTML({ k: "telefone", label: "Telefone / WhatsApp", type: "tel" }, c.telefone)}
         ${fieldHTML({ k: "email", label: "E-mail" }, c.email)}
         ${fieldHTML({ k: "endereco", label: "Endereço", full: true }, c.endereco)}
         ${fieldHTML({ k: "validade", label: "Validade padrão (dias)", type: "number", step: "1" }, c.validade)}
@@ -713,7 +718,7 @@ function editorView(id, q) {
       <div><label>Veículo *</label><div style="display:flex;gap:6px">
         <select id="eVeiculo">${veicOptions(d)}</select>
         <button class="btn" data-act="quickVeiculo" title="Novo veículo">+</button></div></div>
-      <div><label>Km na entrada</label><input id="eKm" data-f="km" type="number" min="0" value="${esc(d.km)}"></div>
+      <div><label>Km na entrada</label><input id="eKm" data-f="km" type="number" inputmode="numeric" min="0" value="${esc(d.km)}"></div>
       <div><label>Status</label><select data-f="status">${Object.entries(STATUS)
         .map(
           ([k, l]) =>
@@ -725,15 +730,15 @@ function editorView(id, q) {
       <div class="full"><label>Problema relatado / diagnóstico</label><textarea data-f="problema" rows="2">${esc(d.problema)}</textarea></div>
     </div></div>
 
-    <div class="card"><div class="page-head" style="margin-bottom:10px"><h2>Itens</h2>
+    <div class="card"><div class="page-head items-head" style="margin-bottom:10px"><h2>Itens</h2>
       <div class="actions"><button class="btn sm" data-act="addPeca">+ Peça / material</button>
       <button class="btn sm" data-act="addServico">+ Serviço / mão de obra</button></div></div>
       <div class="table-wrap"><table class="items"><thead><tr><th>Tipo</th><th>Descrição</th><th class="w-qtd">Qtd</th>
         <th class="w-val">Custo un. <span title="Interno, não sai no PDF">ⓘ</span></th><th class="w-val">Valor un.</th><th class="num">Subtotal</th><th></th></tr></thead>
         <tbody id="itemsBody">${itemsRows(d)}</tbody></table></div>
-      <div style="display:flex;gap:20px;flex-wrap:wrap;margin-top:16px">
-        <div style="flex:1;min-width:240px" class="grid">
-          <div><label>Desconto (R$)</label><input type="number" min="0" step="0.01" data-f="desconto" value="${esc(d.desconto || "")}"></div>
+      <div class="editor-foot">
+        <div class="grid">
+          <div><label>Desconto (R$)</label><input type="number" inputmode="decimal" min="0" step="0.01" data-f="desconto" value="${esc(d.desconto || "")}"></div>
           <div><label>Prazo de execução</label><input data-f="prazo" value="${esc(d.prazo)}" placeholder="2 dias úteis"></div>
           <div class="full"><label>Forma de pagamento</label><input data-f="pagamento" value="${esc(d.pagamento)}" placeholder="PIX, cartão em até 3x..."></div>
           <div class="full"><label>Observações (saem no PDF)</label><textarea data-f="obs" rows="2">${esc(d.obs)}</textarea></div>
@@ -742,9 +747,9 @@ function editorView(id, q) {
       </div></div>
 
     <div class="sticky-actions">
-      <button class="btn" data-act="pdf">📄 Baixar PDF</button>
-      <button class="btn wa" data-act="whats">Enviar no WhatsApp</button>
-      <button class="btn primary" data-act="salvarOrc">Salvar orçamento</button>
+      <button class="btn" data-act="pdf">📄 <span class="l-long">Baixar PDF</span><span class="l-short">PDF</span></button>
+      <button class="btn wa" data-act="whats"><span class="l-long">Enviar no WhatsApp</span><span class="l-short">WhatsApp</span></button>
+      <button class="btn primary" data-act="salvarOrc"><span class="l-long">Salvar orçamento</span><span class="l-short">Salvar</span></button>
     </div>`;
 }
 
@@ -782,12 +787,12 @@ function itemsRows(d) {
             .join("")}</select>
          <input data-i="${i}" data-k="descricao" value="${esc(it.descricao)}" placeholder="Descrição da peça">`
         : `<input data-i="${i}" data-k="descricao" value="${esc(it.descricao)}" placeholder="Ex.: Troca de pastilhas dianteiras">`;
-      return `<tr><td>${isP ? "Peça" : "Serviço"}</td><td style="min-width:240px">${desc}</td>
-      <td><input class="w-qtd" type="number" min="0" step="any" data-i="${i}" data-k="qtd" value="${esc(it.qtd)}"></td>
-      <td>${isP ? `<input class="w-val" type="number" min="0" step="0.01" data-i="${i}" data-k="custo" value="${esc(it.custo)}">` : '<span class="muted">—</span>'}</td>
-      <td><input class="w-val" type="number" min="0" step="0.01" data-i="${i}" data-k="valor" value="${esc(it.valor)}"></td>
-      <td class="num" data-sub="${i}">${brl(num(it.qtd) * num(it.valor))}</td>
-      <td><button class="btn sm danger" data-act="rmItem" data-i="${i}">✕</button></td></tr>`;
+      return `<tr><td class="it-tipo"><span class="tag ${isP ? "t-peca" : "t-serv"}">${isP ? "Peça" : "Serviço"}</span></td><td class="it-desc">${desc}</td>
+      <td class="it-qtd" data-l="Qtd"><input class="w-qtd" type="number" inputmode="decimal" min="0" step="any" data-i="${i}" data-k="qtd" value="${esc(it.qtd)}"></td>
+      <td class="it-custo" data-l="Custo un.">${isP ? `<input class="w-val" type="number" inputmode="decimal" min="0" step="0.01" data-i="${i}" data-k="custo" value="${esc(it.custo)}">` : '<span class="muted">—</span>'}</td>
+      <td class="it-valor" data-l="Valor un."><input class="w-val" type="number" inputmode="decimal" min="0" step="0.01" data-i="${i}" data-k="valor" value="${esc(it.valor)}"></td>
+      <td class="num it-sub"><span class="it-sub-l">Subtotal </span><b data-sub="${i}">${brl(num(it.qtd) * num(it.valor))}</b></td>
+      <td class="it-rm"><button class="btn sm danger" data-act="rmItem" data-i="${i}" aria-label="Remover item">✕</button></td></tr>`;
     })
     .join("");
 }
@@ -1138,38 +1143,109 @@ function baixarPDF() {
   toast("PDF gerado");
 }
 
+// Texto do orçamento com a formatação do WhatsApp (*negrito*, _itálico_)
+function textoOrcamento(o) {
+  const cfg = db.config,
+    c = getCliente(o.clienteId) || {},
+    v = getVeiculo(o.veiculoId) || {},
+    t = totais(o);
+  // asteriscos e sublinhados digitados pelo usuário não podem quebrar a formatação
+  const limpo = (s) => String(s || "").replace(/[*_~`]/g, "").trim();
+  const qtd = (n) => num(n).toLocaleString("pt-BR");
+  const linhaItem = (it) => {
+    const desc = limpo(it.descricao) || "Item";
+    const sub = brl(num(it.qtd) * num(it.valor));
+    if (num(it.qtd) === 1) return `• ${desc} — ${sub}`;
+    const un = it.tipo !== "servico" ? " " + (it.unidade || "un") : "";
+    return `• ${desc}\n   ${qtd(it.qtd)}${un} × ${brl(it.valor)} = ${sub}`;
+  };
+  const pecas = o.itens.filter((i) => i.tipo !== "servico");
+  const servs = o.itens.filter((i) => i.tipo === "servico");
+  const primeiro = limpo(c.nome).split(" ")[0];
+  const veic = [limpo(veiculoLabel(v)), v.placa && `placa ${v.placa}`]
+    .filter(Boolean)
+    .join(", ");
+
+  const L = [];
+  L.push(`*${limpo(cfg.nome) || "Oficina"}*`);
+  L.push(`*ORÇAMENTO Nº ${pad(o.numero)}*`);
+  L.push(
+    [
+      o.data && `Emissão: ${fmtDate(o.data)}`,
+      o.validade && `Válido até: ${fmtDate(o.validade)}`,
+    ]
+      .filter(Boolean)
+      .join("  |  "),
+  );
+  L.push("");
+  L.push(
+    `Olá${primeiro ? ", " + primeiro : ""}! Segue o orçamento${veic ? ` do seu *${veic}*` : ""}.`,
+  );
+  if (o.km) L.push(`Km na entrada: ${qtd(o.km)}`);
+  if (o.problema) {
+    L.push("", "*Problema relatado / diagnóstico*", limpo(o.problema));
+  }
+  if (pecas.length) {
+    L.push("", "*Peças e materiais*", ...pecas.map(linhaItem));
+  }
+  if (servs.length) {
+    L.push("", "*Serviços / mão de obra*", ...servs.map(linhaItem));
+  }
+  L.push("");
+  if (pecas.length) L.push(`Peças: ${brl(t.pecas)}`);
+  if (servs.length) L.push(`Serviços: ${brl(t.servicos)}`);
+  if (t.desconto) L.push(`Desconto: − ${brl(t.desconto)}`);
+  L.push(`*TOTAL: ${brl(t.total)}*`);
+  const extra = [
+    o.prazo && `*Prazo:* ${limpo(o.prazo)}`,
+    o.pagamento && `*Pagamento:* ${limpo(o.pagamento)}`,
+    o.obs && `*Observações:* ${limpo(o.obs)}`,
+  ].filter(Boolean);
+  if (extra.length) L.push("", ...extra);
+  if (cfg.rodape) L.push("", `_${limpo(cfg.rodape)}_`);
+  L.push("", "O PDF do orçamento segue em anexo. Qualquer dúvida, estou à disposição!");
+  const assina = [limpo(cfg.nome), limpo(cfg.telefone)].filter(Boolean).join(" · ");
+  if (assina) L.push(`_${assina}_`);
+  return L.join("\n");
+}
+
 async function enviarWhats() {
   const o = salvarOrc(true);
   if (!o) return;
-  const c = getCliente(o.clienteId),
-    v = getVeiculo(o.veiculoId);
-  const tel = waNumber(c?.telefone);
-  if (!tel) return toast("Cliente sem telefone cadastrado");
+  const c = getCliente(o.clienteId);
   const doc = gerarPDF(o),
     fname = pdfName(o);
-  const primeiro = (c.nome || "").split(" ")[0];
-  const msg =
-    `Olá ${primeiro}! Segue o orçamento nº ${pad(o.numero)} da ${db.config.nome} para o ${veiculoLabel(v)} (placa ${v.placa}).\n\n` +
-    `Total: ${brl(totais(o).total)}\n${o.validade ? "Válido até " + fmtDate(o.validade) + ".\n" : ""}\nQualquer dúvida estou à disposição.`;
-
-  // Celular: compartilha o PDF direto (escolha o contato no WhatsApp)
+  const msg = textoOrcamento(o);
   const file = new File([doc.output("blob")], fname, {
     type: "application/pdf",
   });
+
+  // Celular: abre o compartilhamento do sistema com o PDF e o texto juntos.
+  // Nada de await antes do share: o navegador exige que ele venha direto do toque.
   const mobile = matchMedia("(pointer:coarse)").matches;
   if (mobile && navigator.canShare && navigator.canShare({ files: [file] })) {
+    // cópia do texto, caso o app de destino descarte o texto e fique só com o PDF
+    try {
+      navigator.clipboard?.writeText(msg).catch(() => {});
+    } catch (e) {
+      /* sem área de transferência, segue */
+    }
     try {
       await navigator.share({
         files: [file],
         text: msg,
         title: "Orçamento " + pad(o.numero),
       });
+      toast("Enviado. Se o texto não aparecer na conversa, cole: ele já está copiado.");
       return;
     } catch (e) {
       if (e.name === "AbortError") return;
     }
   }
-  // Computador: baixa o PDF e abre a conversa do cliente com a mensagem pronta
+
+  // Computador (ou celular sem suporte): baixa o PDF e abre a conversa com o texto pronto.
+  const tel = waNumber(c?.telefone);
+  if (!tel) return toast("Cliente sem telefone cadastrado");
   doc.save(fname);
   window.open(
     `https://wa.me/${tel}?text=${encodeURIComponent(msg)}`,
@@ -1177,7 +1253,7 @@ async function enviarWhats() {
     "noopener",
   );
   toast(
-    "PDF baixado. Arraste o arquivo para a conversa do WhatsApp que abriu.",
+    "PDF baixado. Anexe o arquivo na conversa do WhatsApp que abriu (o texto já está lá).",
   );
 }
 
