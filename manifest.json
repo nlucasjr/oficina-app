@@ -1,0 +1,17 @@
+{
+  "name": "Mecânica Rodrigues — Gestão",
+  "short_name": "Oficina",
+  "description": "Gestão de clientes, veículos, peças e orçamentos da oficina.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "lang": "pt-BR",
+  "background_color": "#201e1f",
+  "theme_color": "#201e1f",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
