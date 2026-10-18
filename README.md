@@ -56,7 +56,7 @@ oficina-app/
 ├── icons/            Ícones do app (192, 512, maskable e apple-touch).
 ├── logo.png          Logo da barra lateral (fundo escuro).
 ├── logo-branco.png   Logo da tela de login (fundo branco).
-└── supabase.sql      Script que cria a tabela e as regras de acesso no Supabase.
+└── supabase.sql      Script que cria a tabela, as regras de acesso e a numeração dos orçamentos no Supabase.
 ```
 
 ---
@@ -150,6 +150,27 @@ Na **primeira vez** que alguém entra num banco vazio, se o navegador já tinha 
 - **Cadastros** (cliente, veículo, peça) abrem num formulário em janela (`formModal`), que valida e devolve os valores.
 - **Editor de orçamento**: enquanto você edita, as mudanças ficam num rascunho (`draft`). Os totais são recalculados a cada tecla. O orçamento só entra no `db` ao clicar em **Salvar**, **PDF** ou **WhatsApp**.
 
+### Numeração dos orçamentos
+
+O número de um orçamento novo é **gerado pelo banco**, para que dois aparelhos salvando ao mesmo tempo nunca recebam o mesmo número.
+
+```mermaid
+sequenceDiagram
+  participant A as app.js
+  participant S as Supabase
+  A->>A: Salvar / PDF / WhatsApp em orçamento novo
+  A->>S: rpc("proximo_numero_orcamento")
+  S->>S: trava, pega o maior número já usado e a sequência
+  S-->>A: próximo número (ex.: 43)
+  A->>A: salvarOrc(): grava no db e sincroniza
+```
+
+- A função `proximo_numero_orcamento()` (criada pelo `supabase.sql`) usa uma sequência do PostgreSQL e uma trava, e nunca devolve um número menor ou igual ao maior já gravado. Isso cobre orçamentos antigos e backups restaurados.
+- Só orçamentos **novos** pedem número. Salvar de novo um orçamento existente não vai ao banco.
+- **Sem conexão**, o orçamento novo não é salvo: aparece um aviso e o rascunho continua na tela para tentar de novo.
+- **Modo local**, ou se a função ainda não existir no Supabase: o número é o maior existente + 1, calculado no navegador.
+- **WhatsApp de orçamento novo no iPhone:** como o app espera o número do banco, o iPhone pode não abrir o compartilhamento nesse primeiro toque. Nesse caso o orçamento é salvo e o app pede para tocar em WhatsApp de novo.
+
 ### 3. Salvar e sincronizar
 
 ```mermaid
@@ -196,6 +217,8 @@ registros (
   primary key (tipo, id)
 )
 ```
+
+Além da tabela, o banco tem a sequência `orcamento_numero_seq` e a função `proximo_numero_orcamento()`, usadas só para numerar orçamentos.
 
 Cada cliente, veículo, peça e orçamento é **uma linha**, com o objeto inteiro no campo JSON `data`. As configurações da oficina são a linha `tipo = 'config'`, `id = 'main'`. Não existem colunas separadas para telefone, placa etc.: tudo fica dentro do `data`.
 
@@ -297,7 +320,7 @@ Também funciona com a extensão **Live Server** do VS Code (botão *Go Live*). 
 ### Configurar o Supabase (uma vez)
 
 1. Crie um projeto no Supabase.
-2. Em **SQL Editor**, rode o conteúdo de `supabase.sql`.
+2. Em **SQL Editor**, rode o conteúdo de `supabase.sql`. Ele pode ser rodado de novo sem perder dados; faça isso sempre que o arquivo mudar.
 3. Em **Authentication → Users**, crie os usuários (e-mail e senha).
 4. Em **Project Settings → API Keys**, copie a URL do projeto e a chave *publishable* para o `config.js`.
 
@@ -311,7 +334,7 @@ Todo push na `main` publica automaticamente no GitHub Pages (Settings → Pages)
 
 ## Limitações conhecidas
 
-- **Numeração dos orçamentos:** o próximo número é calculado no navegador (maior número existente + 1). Se dois aparelhos criarem um orçamento no mesmo instante, podem gerar o mesmo número.
+- **Números pulados:** um número pedido ao banco e não usado (por exemplo, se a gravação falhar depois) não volta. A numeração pode ter lacunas, mas nunca repete.
 - **Conflitos:** a sincronização é por registro e vale o último que salvou. Duas pessoas editando o mesmo orçamento ao mesmo tempo podem sobrescrever uma à outra.
 - **Offline:** o app abre sem internet, mas o login e o carregamento dos dados precisam de conexão. Edições feitas sem rede ficam pendentes e se perdem se o app for fechado antes de sincronizar.
 - **Sem perfis de acesso:** qualquer usuário logado pode alterar e excluir tudo.

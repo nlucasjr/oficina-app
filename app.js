@@ -879,6 +879,48 @@ function validarDraft() {
   return true;
 }
 
+// Próximo número de orçamento. Com a nuvem ligada, quem decide é o banco
+// (função proximo_numero_orcamento no Supabase), então dois aparelhos nunca
+// recebem o mesmo número. No modo local, é o maior número existente + 1.
+const numeroLocal = () =>
+  Math.max(0, ...db.orcamentos.map((x) => x.numero || 0)) + 1;
+async function proximoNumero() {
+  if (!window.cloud?.on) return numeroLocal();
+  const { data, error } = await cloud.sb.rpc("proximo_numero_orcamento");
+  if (!error && Number(data) > 0) return Number(data);
+  // função ainda não criada no Supabase: segue funcionando com a numeração local
+  if (error?.code === "PGRST202" || error?.code === "42883") {
+    console.warn(
+      "Função proximo_numero_orcamento não encontrada no Supabase. Rode o supabase.sql. Usando numeração local.",
+    );
+    return numeroLocal();
+  }
+  throw error || new Error("Resposta inválida ao pedir o número do orçamento");
+}
+
+// Garante que o rascunho tenha número antes de salvar. Só vai ao banco
+// para orçamento novo; os já salvos não esperam nada.
+let numerando = false;
+async function numerarDraft() {
+  const d = draft;
+  if (!d) return false;
+  if (d.numero) return true;
+  if (!validarDraft() || numerando) return false;
+  numerando = true;
+  try {
+    const n = await proximoNumero();
+    if (draft !== d) return false; // saiu da tela enquanto esperava
+    d.numero = n;
+    return true;
+  } catch (e) {
+    console.error("Falha ao numerar o orçamento", e);
+    toast("Sem conexão com o banco: o orçamento não foi salvo. Tente de novo.");
+    return false;
+  } finally {
+    numerando = false;
+  }
+}
+
 function salvarOrc(silent) {
   if (!validarDraft()) return null;
   const d = draft;
@@ -893,7 +935,7 @@ function salvarOrc(silent) {
   delete d._q;
   if (!d.id) {
     d.id = uid();
-    d.numero = Math.max(0, ...db.orcamentos.map((x) => x.numero || 0)) + 1;
+    if (!d.numero) d.numero = numeroLocal(); // normalmente já veio de numerarDraft()
     db.orcamentos.push(structuredClone(d));
   } else {
     const i = db.orcamentos.findIndex((o) => o.id === d.id);
@@ -1136,7 +1178,8 @@ function gerarPDF(o) {
 const pdfName = (o) =>
   `orcamento-${pad(o.numero)}-${(getVeiculo(o.veiculoId)?.placa || "").toLowerCase()}.pdf`;
 
-function baixarPDF() {
+async function baixarPDF() {
+  if (!(await numerarDraft())) return;
   const o = salvarOrc(true);
   if (!o) return;
   gerarPDF(o).save(pdfName(o));
@@ -1210,6 +1253,10 @@ function textoOrcamento(o) {
 }
 
 async function enviarWhats() {
+  // Orçamento novo precisa do número do banco antes. Os já salvos não esperam,
+  // porque o compartilhamento do celular precisa vir direto do toque.
+  const novo = !draft?.numero;
+  if (novo && !(await numerarDraft())) return;
   const o = salvarOrc(true);
   if (!o) return;
   const c = getCliente(o.clienteId);
@@ -1240,6 +1287,12 @@ async function enviarWhats() {
       return;
     } catch (e) {
       if (e.name === "AbortError") return;
+      // alguns celulares (iPhone) só abrem o compartilhamento direto do toque;
+      // como o orçamento novo esperou o número do banco, pede um segundo toque
+      if (novo && e.name === "NotAllowedError") {
+        toast(`Orçamento nº ${pad(o.numero)} salvo. Toque em WhatsApp de novo para enviar.`);
+        return;
+      }
     }
   }
 
@@ -1300,7 +1353,9 @@ const actions = {
     draft.itens.splice(+b.dataset.i, 1);
     rerenderItems();
   },
-  salvarOrc: () => salvarOrc(),
+  salvarOrc: async () => {
+    if (await numerarDraft()) salvarOrc();
+  },
   pdf: baixarPDF,
   whats: enviarWhats,
   exportar: () => {
