@@ -1178,12 +1178,36 @@ function gerarPDF(o) {
 const pdfName = (o) =>
   `orcamento-${pad(o.numero)}-${(getVeiculo(o.veiculoId)?.placa || "").toLowerCase()}.pdf`;
 
-async function baixarPDF() {
-  if (!(await numerarDraft())) return;
+// Botão PDF: no celular abre o compartilhamento do sistema com o arquivo
+// (escolha WhatsApp, e-mail etc.); no computador baixa o arquivo.
+async function enviarPDF() {
+  // Orçamento novo espera o número do banco. Os já salvos não esperam nada,
+  // porque o compartilhamento do celular precisa vir direto do toque.
+  const novo = !draft?.numero;
+  if (novo && !(await numerarDraft())) return;
   const o = salvarOrc(true);
   if (!o) return;
-  gerarPDF(o).save(pdfName(o));
-  toast("PDF gerado");
+  const doc = gerarPDF(o),
+    fname = pdfName(o);
+  const file = new File([doc.output("blob")], fname, {
+    type: "application/pdf",
+  });
+  const mobile = matchMedia("(pointer:coarse)").matches;
+  if (mobile && navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title: "Orçamento " + pad(o.numero) });
+      return;
+    } catch (e) {
+      if (e.name === "AbortError") return;
+      // iPhone só abre o compartilhamento direto do toque: pede um segundo toque
+      if (novo && e.name === "NotAllowedError") {
+        toast(`Orçamento nº ${pad(o.numero)} salvo. Toque em PDF de novo para enviar.`);
+        return;
+      }
+    }
+  }
+  doc.save(fname);
+  toast("PDF baixado");
 }
 
 // Texto do orçamento com a formatação do WhatsApp (*negrito*, _itálico_)
@@ -1246,67 +1270,36 @@ function textoOrcamento(o) {
   ].filter(Boolean);
   if (extra.length) L.push("", ...extra);
   if (cfg.rodape) L.push("", `_${limpo(cfg.rodape)}_`);
-  L.push("", "O PDF do orçamento segue em anexo. Qualquer dúvida, estou à disposição!");
+  L.push("", "Qualquer dúvida, estou à disposição!");
   const assina = [limpo(cfg.nome), limpo(cfg.telefone)].filter(Boolean).join(" · ");
   if (assina) L.push(`_${assina}_`);
   return L.join("\n");
 }
 
+// Botão WhatsApp: abre a conversa do cliente com o orçamento em texto.
 async function enviarWhats() {
-  // Orçamento novo precisa do número do banco antes. Os já salvos não esperam,
-  // porque o compartilhamento do celular precisa vir direto do toque.
   const novo = !draft?.numero;
   if (novo && !(await numerarDraft())) return;
   const o = salvarOrc(true);
   if (!o) return;
-  const c = getCliente(o.clienteId);
-  const doc = gerarPDF(o),
-    fname = pdfName(o);
-  const msg = textoOrcamento(o);
-  const file = new File([doc.output("blob")], fname, {
-    type: "application/pdf",
-  });
-
-  // Celular: abre o compartilhamento do sistema com o PDF e o texto juntos.
-  // Nada de await antes do share: o navegador exige que ele venha direto do toque.
-  const mobile = matchMedia("(pointer:coarse)").matches;
-  if (mobile && navigator.canShare && navigator.canShare({ files: [file] })) {
-    // cópia do texto, caso o app de destino descarte o texto e fique só com o PDF
+  const tel = waNumber(getCliente(o.clienteId)?.telefone);
+  // sem telefone, o WhatsApp abre a lista de contatos para escolher
+  const url = `https://wa.me/${tel}?text=${encodeURIComponent(textoOrcamento(o))}`;
+  const w = window.open(url, "_blank");
+  if (w) {
     try {
-      navigator.clipboard?.writeText(msg).catch(() => {});
+      w.opener = null;
     } catch (e) {
-      /* sem área de transferência, segue */
+      /* outra origem, nada a fazer */
     }
-    try {
-      await navigator.share({
-        files: [file],
-        text: msg,
-        title: "Orçamento " + pad(o.numero),
-      });
-      toast("Enviado. Se o texto não aparecer na conversa, cole: ele já está copiado.");
-      return;
-    } catch (e) {
-      if (e.name === "AbortError") return;
-      // alguns celulares (iPhone) só abrem o compartilhamento direto do toque;
-      // como o orçamento novo esperou o número do banco, pede um segundo toque
-      if (novo && e.name === "NotAllowedError") {
-        toast(`Orçamento nº ${pad(o.numero)} salvo. Toque em WhatsApp de novo para enviar.`);
-        return;
-      }
-    }
+    if (!tel) toast("Cliente sem telefone cadastrado: escolha o contato no WhatsApp.");
+    return;
   }
-
-  // Computador (ou celular sem suporte): baixa o PDF e abre a conversa com o texto pronto.
-  const tel = waNumber(c?.telefone);
-  if (!tel) return toast("Cliente sem telefone cadastrado");
-  doc.save(fname);
-  window.open(
-    `https://wa.me/${tel}?text=${encodeURIComponent(msg)}`,
-    "_blank",
-    "noopener",
-  );
+  // navegador bloqueou a nova janela (comum quando o orçamento novo esperou o número)
   toast(
-    "PDF baixado. Anexe o arquivo na conversa do WhatsApp que abriu (o texto já está lá).",
+    novo
+      ? `Orçamento nº ${pad(o.numero)} salvo. Toque em WhatsApp de novo para abrir a conversa.`
+      : "O navegador bloqueou a abertura do WhatsApp. Permita pop-ups para este site.",
   );
 }
 
@@ -1356,7 +1349,7 @@ const actions = {
   salvarOrc: async () => {
     if (await numerarDraft()) salvarOrc();
   },
-  pdf: baixarPDF,
+  pdf: enviarPDF,
   whats: enviarWhats,
   exportar: () => {
     const blob = new Blob([JSON.stringify(db, null, 2)], {

@@ -169,7 +169,7 @@ sequenceDiagram
 - Só orçamentos **novos** pedem número. Salvar de novo um orçamento existente não vai ao banco.
 - **Sem conexão**, o orçamento novo não é salvo: aparece um aviso e o rascunho continua na tela para tentar de novo.
 - **Modo local**, ou se a função ainda não existir no Supabase: o número é o maior existente + 1, calculado no navegador.
-- **WhatsApp de orçamento novo no iPhone:** como o app espera o número do banco, o iPhone pode não abrir o compartilhamento nesse primeiro toque. Nesse caso o orçamento é salvo e o app pede para tocar em WhatsApp de novo.
+- **WhatsApp ou PDF num orçamento novo:** como o app espera o número do banco, o navegador (principalmente no iPhone) pode bloquear a abertura do WhatsApp ou do compartilhamento nesse primeiro toque. Nesse caso o orçamento é salvo e o app pede para tocar no botão de novo.
 
 ### 3. Salvar e sincronizar
 
@@ -277,14 +277,16 @@ Regras importantes:
 - tabelas de peças e serviços (via autoTable);
 - totais, prazo, pagamento, observações, linha de aprovação do cliente e rodapé de garantia.
 
-**WhatsApp** (`enviarWhats`): monta um texto com a formatação do WhatsApp (`*negrito*`, `_itálico_`) com o orçamento completo (`textoOrcamento`) e:
+No editor de orçamento, os dois botões têm funções separadas:
 
-| Onde | O que acontece |
-|---|---|
-| Celular com suporte a compartilhar arquivos | Abre o compartilhamento do sistema com **PDF + texto** juntos; você escolhe o WhatsApp e o contato. O texto também é copiado, caso o app de destino descarte o texto. |
-| Computador (ou celular sem suporte) | Baixa o PDF e abre `wa.me/<telefone do cliente>` com o texto pronto; basta anexar o PDF na conversa. |
+| Botão | Celular | Computador |
+|---|---|---|
+| **WhatsApp** (`enviarWhats`) | Abre a conversa do cliente (`wa.me/<telefone>`) com o orçamento **em texto** pronto para enviar. | Igual: abre o WhatsApp Web ou o app com o texto pronto. |
+| **PDF** (`enviarPDF`) | Gera o PDF e abre o compartilhamento do sistema com o **arquivo**; você escolhe WhatsApp, e-mail etc. e o contato. | Baixa o arquivo PDF. |
 
-O link `wa.me` não permite anexar arquivos. Por isso o PDF só vai junto no celular, pelo compartilhamento do sistema.
+- O texto (`textoOrcamento`) usa a formatação do WhatsApp (`*negrito*`, `_itálico_`) e traz itens, quantidades, valores, totais, prazo, pagamento, observações e garantia.
+- Se o cliente não tiver telefone, o WhatsApp abre a lista de contatos para escolher.
+- O compartilhamento do sistema não permite escolher o contato antes; ele é escolhido dentro do WhatsApp.
 
 ---
 
