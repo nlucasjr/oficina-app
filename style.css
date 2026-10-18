@@ -93,6 +93,9 @@ td.num, th.num { text-align: right; }
 .tag { display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 99px; white-space: nowrap; }
 .t-peca { background: #fff4e6; color: #d9480f; }
 .t-serv { background: #e7f5ff; color: var(--info); }
+.resp-cliente { border-left: 5px solid; padding: 12px 16px; }
+.resp-ok { border-left-color: var(--ok); background: #ebfbee; }
+.resp-no { border-left-color: var(--bad); background: #fff5f5; }
 .editor-foot { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 16px; align-items: flex-start; }
 .editor-foot > .grid { flex: 1; min-width: 240px; }
 .totals { margin-left: auto; max-width: 380px; }

@@ -89,7 +89,16 @@ const cloud = {
       const before = JSON.stringify([...cloud.synced].sort());
       const after = JSON.stringify(rows.map(r => [r.tipo + '|' + r.id, JSON.stringify(r.data)]).sort());
       if (before === after) return;
+      // respostas que os clientes deram pelo link desde a última atualização
+      const antes = new Map(db.orcamentos.map(o => [o.id, o.resposta?.em || '']));
       cloud.apply(rows);
+      const novas = db.orcamentos.filter(o => antes.has(o.id) && o.resposta?.em && o.resposta.em !== antes.get(o.id));
+      if (novas.length === 1) {
+        const o = novas[0];
+        toast(`Cliente ${o.resposta.acao === 'aprovado' ? 'aprovou' : 'recusou'} o orçamento nº ${pad(o.numero)} pelo link`);
+      } else if (novas.length > 1) {
+        toast(`${novas.length} orçamentos foram respondidos pelos clientes`);
+      }
       if (!location.hash.startsWith('#orcamento/')) render();
     } catch (e) { setSync('error'); }
   },

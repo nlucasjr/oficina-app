@@ -46,7 +46,8 @@ Não há servidor próprio: o navegador fala direto com o Supabase. O GitHub Pag
 oficina-app/
 ├── index.html        Esqueleto da página: menu, área principal, tela de login, janela (modal) e aviso (toast).
 │                     Carrega as bibliotecas de CDN e os scripts do app, nesta ordem.
-├── config.js         URL e chave pública do Supabase. Vazio = modo local (sem nuvem).
+├── orcamento.html    Página pública que o cliente abre pelo link: vê o orçamento e aprova ou recusa.
+├── config.js         URL e chave pública do Supabase (vazio = modo local) e endereço público do link do cliente.
 ├── app.js            O app em si: dados em memória, telas, formulários, editor de orçamento,
 │                     PDF, WhatsApp, roteamento e eventos.
 ├── cloud.js          Login e sincronização com o Supabase. Inicia o app (boot).
@@ -218,7 +219,16 @@ registros (
 )
 ```
 
-Além da tabela, o banco tem a sequência `orcamento_numero_seq` e a função `proximo_numero_orcamento()`, usadas só para numerar orçamentos.
+Além da tabela, o banco tem:
+
+| Objeto | Para que serve | Quem pode usar |
+|---|---|---|
+| `orcamento_numero_seq` + `proximo_numero_orcamento()` | Numerar orçamentos sem repetir | Usuários logados |
+| `orcamento_publico(token)` | Página do cliente ler um orçamento | Qualquer pessoa com o link |
+| `responder_orcamento(token, aprovar, nome)` | Cliente aprovar ou recusar | Qualquer pessoa com o link |
+| `orcamento_visao_cliente(registro)` | Montar o que o cliente pode ver (uso interno) | Ninguém de fora |
+| gatilho `preservar_resposta_cliente` | Não deixar uma cópia antiga apagar a resposta do cliente | Automático |
+| índice `registros_orcamento_token_idx` | Achar o orçamento pelo código rapidamente | Automático |
 
 Cada cliente, veículo, peça e orçamento é **uma linha**, com o objeto inteiro no campo JSON `data`. As configurações da oficina são a linha `tipo = 'config'`, `id = 'main'`. Não existem colunas separadas para telefone, placa etc.: tudo fica dentro do `data`.
 
@@ -260,7 +270,7 @@ Regras importantes:
 ## Segurança e usuários
 
 - A **chave do `config.js`** é a chave *publishable* do Supabase. Ela pode ficar pública: quem protege os dados é o login e as regras do banco.
-- O **`supabase.sql`** liga o *Row Level Security* na tabela e só permite ler e gravar a usuários **logados** (`authenticated`). Visitantes anônimos não têm acesso.
+- O **`supabase.sql`** liga o *Row Level Security* na tabela e só permite ler e gravar a usuários **logados** (`authenticated`). Visitantes anônimos não têm acesso à tabela; a única coisa que podem fazer é abrir e responder um orçamento pelo link, por meio das duas funções públicas (veja [Link de aprovação](#link-de-aprovação-para-o-cliente)).
 - **Há um único tipo de usuário.** Todos os logados veem e alteram tudo. Não existem perfis (administrador, atendente etc.).
 - **Usuários são criados manualmente** no painel do Supabase (Authentication → Users). O app não tem tela de cadastro.
 - Ao clicar em **Sair**, o app encerra a sessão e apaga a cópia local dos dados daquele navegador.
@@ -284,9 +294,37 @@ No editor de orçamento, os dois botões têm funções separadas:
 | **WhatsApp** (`enviarWhats`) | Abre a conversa do cliente (`wa.me/<telefone>`) com o orçamento **em texto** pronto para enviar. | Igual: abre o WhatsApp Web ou o app com o texto pronto. |
 | **PDF** (`enviarPDF`) | Gera o PDF e abre o compartilhamento do sistema com o **arquivo**; você escolhe WhatsApp, e-mail etc. e o contato. | Baixa o arquivo PDF. |
 
-- O texto (`textoOrcamento`) usa a formatação do WhatsApp (`*negrito*`, `_itálico_`) e traz itens, quantidades, valores, totais, prazo, pagamento, observações e garantia.
+- O texto (`textoOrcamento`) usa a formatação do WhatsApp (`*negrito*`, `_itálico_`) e traz itens, quantidades, valores, totais, prazo, pagamento, observações, garantia e o **link de aprovação** (veja abaixo).
 - Se o cliente não tiver telefone, o WhatsApp abre a lista de contatos para escolher.
 - O compartilhamento do sistema não permite escolher o contato antes; ele é escolhido dentro do WhatsApp.
+
+### Link de aprovação para o cliente
+
+A mensagem do WhatsApp leva um link como `https://nlucasjr.github.io/oficina-app/orcamento.html?t=<código>`. O cliente abre sem login, vê o orçamento e toca em **Aprovar** ou **Recusar**.
+
+```mermaid
+sequenceDiagram
+  participant O as Oficina (app.js)
+  participant S as Supabase
+  participant C as Cliente (orcamento.html)
+  O->>O: salvar orçamento gera um código secreto (token)
+  O->>S: sincroniza o orçamento com o token
+  O->>C: WhatsApp com o link ?t=token
+  C->>S: rpc orcamento_publico(token)
+  S-->>C: só os dados do orçamento, sem custos internos
+  C->>S: rpc responder_orcamento(token, aprovar, nome)
+  S->>S: grava status e resposta (se em aberto e dentro da validade)
+  O->>S: atualização automática (até 1 min)
+  S-->>O: status novo e aviso "Cliente aprovou o orçamento nº X"
+```
+
+- **Código secreto:** cada orçamento recebe ao ser salvo um `token` aleatório de 128 bits (22 caracteres) em `data.token`. Só quem tem o link consegue abrir aquele orçamento; não dá para adivinhar outros.
+- **A tabela continua fechada para visitantes.** A página pública só usa duas funções do banco (`orcamento_publico` e `responder_orcamento`), que devolvem apenas o necessário: número, datas, itens com valores de venda, totais, condições, nome do cliente, dados do veículo e contato da oficina. Custos, lucro, telefone e endereço do cliente e a logo ficam de fora.
+- **Regras da resposta:** só orçamentos **em aberto** e **dentro da validade** (no horário de Campo Grande) podem ser respondidos, e só uma vez. Depois disso a página mostra o resultado (aprovado, recusado, vencido ou concluído).
+- **Na oficina:** o editor mostra "Cliente aprovou pelo link (nome) em data e hora", o status muda sozinho e aparece um aviso quando a atualização automática traz a resposta. O botão **🔗 Copiar link** copia o link para enviar por outro meio.
+- **Proteção da resposta:** um gatilho no banco (`preservar_resposta_cliente`) impede que uma cópia antiga do orçamento salva pelo app apague a resposta do cliente ou o código do link. A oficina ainda pode mudar o status depois (por exemplo, para concluído).
+- **`linkBase` no `config.js`** fixa o endereço público usado no link, para ele funcionar mesmo quando o app roda no seu computador.
+- **Modo local:** sem a nuvem, não há link (a página pública lê os dados do Supabase).
 
 ---
 
@@ -340,5 +378,7 @@ Todo push na `main` publica automaticamente no GitHub Pages (Settings → Pages)
 - **Conflitos:** a sincronização é por registro e vale o último que salvou. Duas pessoas editando o mesmo orçamento ao mesmo tempo podem sobrescrever uma à outra.
 - **Offline:** o app abre sem internet, mas o login e o carregamento dos dados precisam de conexão. Edições feitas sem rede ficam pendentes e se perdem se o app for fechado antes de sincronizar.
 - **Sem perfis de acesso:** qualquer usuário logado pode alterar e excluir tudo.
+- **Link de aprovação:** quem tiver o link (por exemplo, se o cliente o encaminhar) consegue ver e responder aquele orçamento. Se o orçamento for alterado depois de aprovado, o cliente não aprova de novo automaticamente; combine a mudança com ele.
+- **Aviso de resposta:** a oficina vê a resposta do cliente na próxima atualização automática (até 1 minuto, ou ao voltar para a aba do app); não há notificação no celular.
 - **Logo do PDF dentro do banco:** uma imagem muito grande deixa a linha de configuração pesada; prefira imagens pequenas.
 - **Bibliotecas por CDN:** sem acesso ao cdnjs/jsDelivr na primeira abertura, o PDF e a nuvem não funcionam.

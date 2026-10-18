@@ -709,7 +709,11 @@ function editorView(id, q) {
     .sort((a, b) => a.nome.localeCompare(b.nome));
   return `<div class="page-head"><div><a href="#orcamentos" class="muted">← Orçamentos</a>
     <h1>${d.id ? "Orçamento #" + pad(d.numero) : "Novo orçamento"}</h1></div>
-    ${d.id ? `<button class="btn danger" data-act="del" data-kind="orcamento" data-id="${d.id}">Excluir</button>` : ""}</div>
+    <div class="actions">
+      ${window.cloud?.on ? `<button class="btn" data-act="copiarLink" title="Link para o cliente ver e aprovar">🔗 Copiar link</button>` : ""}
+      ${d.id ? `<button class="btn danger" data-act="del" data-kind="orcamento" data-id="${d.id}">Excluir</button>` : ""}
+    </div></div>
+    ${respostaClienteHTML(d)}
 
     <div class="card"><div class="grid">
       <div><label>Cliente *</label><div style="display:flex;gap:6px">
@@ -751,6 +755,20 @@ function editorView(id, q) {
       <button class="btn wa" data-act="whats"><span class="l-long">Enviar no WhatsApp</span><span class="l-short">WhatsApp</span></button>
       <button class="btn primary" data-act="salvarOrc"><span class="l-long">Salvar orçamento</span><span class="l-short">Salvar</span></button>
     </div>`;
+}
+
+// Aviso no editor quando o cliente respondeu pelo link
+function respostaClienteHTML(d) {
+  const r = d.resposta;
+  if (!r?.acao) return "";
+  const em = r.em ? new Date(r.em) : null;
+  const quando =
+    em && !isNaN(em)
+      ? ` em ${em.toLocaleDateString("pt-BR")} às ${em.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
+      : "";
+  const ok = r.acao === "aprovado";
+  return `<div class="card resp-cliente ${ok ? "resp-ok" : "resp-no"}">
+    <b>${ok ? "✓ Cliente aprovou" : "✕ Cliente recusou"} pelo link</b>${r.nome ? ` (${esc(r.nome)})` : ""}${quando}.</div>`;
 }
 
 function veicOptions(d) {
@@ -879,6 +897,24 @@ function validarDraft() {
   return true;
 }
 
+// ---------- link de aprovação do cliente ----------
+// Código aleatório (128 bits) que identifica o orçamento na página pública.
+function novoToken() {
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  return btoa(String.fromCharCode(...b))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
+// Link que o cliente abre para ver e aprovar/recusar. Só existe com a nuvem
+// ligada, porque a página pública lê o orçamento do Supabase.
+function linkOrcamento(o) {
+  if (!window.cloud?.on || !o?.token) return "";
+  const cfg = window.OFICINA_CONFIG || {};
+  const base = cfg.linkBase || new URL(".", location.href).href;
+  return new URL("orcamento.html?t=" + encodeURIComponent(o.token), base).href;
+}
+
 // Próximo número de orçamento. Com a nuvem ligada, quem decide é o banco
 // (função proximo_numero_orcamento no Supabase), então dois aparelhos nunca
 // recebem o mesmo número. No modo local, é o maior número existente + 1.
@@ -933,6 +969,7 @@ function salvarOrc(silent) {
   d.desconto = num(d.desconto);
   d.km = d.km ? num(d.km) : "";
   delete d._q;
+  if (!d.token) d.token = novoToken(); // código secreto do link de aprovação
   if (!d.id) {
     d.id = uid();
     if (!d.numero) d.numero = numeroLocal(); // normalmente já veio de numerarDraft()
@@ -1270,6 +1307,8 @@ function textoOrcamento(o) {
   ].filter(Boolean);
   if (extra.length) L.push("", ...extra);
   if (cfg.rodape) L.push("", `_${limpo(cfg.rodape)}_`);
+  const link = linkOrcamento(o);
+  if (link) L.push("", "*Para aprovar ou recusar o orçamento, acesse:*", link);
   L.push("", "Qualquer dúvida, estou à disposição!");
   const assina = [limpo(cfg.nome), limpo(cfg.telefone)].filter(Boolean).join(" · ");
   if (assina) L.push(`_${assina}_`);
@@ -1351,6 +1390,20 @@ const actions = {
   },
   pdf: enviarPDF,
   whats: enviarWhats,
+  copiarLink: async () => {
+    // orçamento novo precisa ser salvo (e numerado) para o link existir
+    if (!draft?.numero && !(await numerarDraft())) return;
+    const o = salvarOrc(true);
+    if (!o) return;
+    const link = linkOrcamento(o);
+    if (!link) return toast("O link só funciona com a nuvem ligada.");
+    try {
+      await navigator.clipboard.writeText(link);
+      toast("Link copiado. Cole na conversa com o cliente.");
+    } catch (e) {
+      prompt("Copie o link do orçamento:", link);
+    }
+  },
   exportar: () => {
     const blob = new Blob([JSON.stringify(db, null, 2)], {
       type: "application/json",
