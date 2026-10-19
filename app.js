@@ -5,6 +5,14 @@
 
 const DB_KEY = "oficina_db_v1";
 
+// ---------- versão do app ----------
+// A cada versão publicada: aumente APP_VERSAO aqui e em version.json (mesmo número).
+// Se a mudança altera o formato dos dados (uma versão antiga estragaria ou
+// apagaria dados novos), iguale também COMPAT_MINIMA a APP_VERSAO: as versões
+// mais antigas que ela ficam impedidas de gravar até serem atualizadas.
+const APP_VERSAO = 4;
+const COMPAT_MINIMA = 4;
+
 // ---------- utilidades ----------
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -69,6 +77,7 @@ function loadDB() {
 let db = loadDB();
 
 function save() {
+  if (window.cloud?.bloqueado) return bloquearDesatualizado();
   try {
     localStorage.setItem(DB_KEY, JSON.stringify(db));
   } catch (e) {
@@ -576,6 +585,7 @@ const actions = {
   editVeiculo: (b) => editVeiculo(b.dataset.id),
   novoServico: (b) => editServico(null, b.dataset.veiculo ? { veiculoId: b.dataset.veiculo } : {}),
   del: (b) => removeItem(b.dataset.kind, b.dataset.id),
+  atualizarApp: () => location.reload(),
   exportar: () => {
     const blob = new Blob([JSON.stringify(db, null, 2)], { type: "application/json" });
     const a = document.createElement("a");
@@ -645,6 +655,51 @@ function render() {
   const section = { cliente: "clientes", veiculo: "veiculos" }[name] || (views[name] ? name : "painel");
   $$("#nav a").forEach((a) => a.classList.toggle("active", a.dataset.r === section));
 }
+// ---------- atualização do app ----------
+// Confere se o site já tem uma versão mais nova que esta e avisa.
+async function verificarAtualizacao() {
+  try {
+    const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" });
+    if (!r.ok) return;
+    const v = await r.json();
+    if (num(v.versao) > APP_VERSAO) avisoAtualizacao();
+  } catch (e) {
+    /* sem internet: tenta de novo depois */
+  }
+}
+function avisoAtualizacao() {
+  if ($("#upd")) return;
+  const el = document.createElement("div");
+  el.id = "upd";
+  el.className = "upd";
+  el.setAttribute("role", "status");
+  el.innerHTML = `<span>Nova versão do app disponível.</span>
+    <button class="btn sm primary" data-act="atualizarApp">Atualizar</button>`;
+  document.body.appendChild(el);
+}
+// Chamado por cloud.js quando o banco exige uma versão mais nova que esta
+function bloquearDesatualizado() {
+  closeModal();
+  if ($("#bloqueio")) return;
+  const el = document.createElement("div");
+  el.id = "bloqueio";
+  el.className = "login";
+  el.innerHTML = `<div class="login-card bloqueio-card">
+    <div class="brand dark"><img class="brand-logo" src="logo-branco.png" alt="Mecânica Rodrigues"></div>
+    <h2>Atualize o app</h2>
+    <p class="muted">Os dados já foram atualizados por uma versão mais nova do app. Para não estragar nada,
+      esta versão não pode mais salvar.</p>
+    <button class="btn primary" style="width:100%;justify-content:center" data-act="atualizarApp">Atualizar agora</button>
+    <p class="muted bloqueio-dica">Se continuar aparecendo, feche o app por completo e abra de novo.</p>
+  </div>`;
+  document.body.appendChild(el);
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") verificarAtualizacao();
+});
+setInterval(verificarAtualizacao, 5 * 60 * 1000);
+setTimeout(verificarAtualizacao, 15000);
+
 window.addEventListener("hashchange", () => {
   render();
   window.scrollTo(0, 0);

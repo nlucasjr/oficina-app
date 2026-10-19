@@ -120,6 +120,16 @@ table.list td.desc { max-width: 420px; }
 .brand.dark { color: var(--text); padding: 0; justify-content: center; }
 .login-card .brand-logo { max-width: 180px; }
 .login-err { color: var(--bad); font-size: 13px; min-height: 18px; margin-top: 8px; }
+/* Aviso de versão nova e bloqueio de versão desatualizada */
+.upd { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 65; display: flex; align-items: center; gap: 12px;
+  background: var(--text); color: #fff; padding: 10px 12px 10px 16px; border-radius: 10px; box-shadow: 0 6px 24px rgba(0,0,0,.25);
+  max-width: calc(100% - 32px); font-size: 14px; }
+.upd .btn { flex-shrink: 0; }
+.bloqueio-card { text-align: center; }
+.bloqueio-card h2 { margin: 14px 0 8px; }
+.bloqueio-card p { line-height: 1.5; }
+.bloqueio-dica { font-size: 13px; margin-bottom: 0; }
+
 /* ================= Celular ================= */
 @media (max-width: 800px) {
   :root { --nav-h: 62px; --safe-b: env(safe-area-inset-bottom, 0px); }
@@ -149,6 +159,7 @@ table.list td.desc { max-width: 420px; }
 
   main { padding: 16px 14px calc(var(--nav-h) + var(--safe-b) + 24px); }
   .toast { bottom: calc(var(--nav-h) + var(--safe-b) + 14px); }
+  .upd { bottom: calc(var(--nav-h) + var(--safe-b) + 12px); width: calc(100% - 28px); justify-content: space-between; }
   h1 { font-size: 21px; }
   .page-head { margin-bottom: 14px; }
   .card { padding: 14px; border-radius: 12px; margin-bottom: 14px; }

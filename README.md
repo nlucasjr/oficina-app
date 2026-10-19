@@ -44,7 +44,8 @@ As imagens usam dados de exemplo (fictícios).
 6. [Modelo de dados](#modelo-de-dados)
 7. [Segurança e usuários](#segurança-e-usuários)
 8. [PWA e service worker](#pwa-e-service-worker)
-9. [Rodar, configurar e publicar](#rodar-configurar-e-publicar)
+9. [Versões e atualizações](#versões-e-atualizações)
+1. [Rodar, configurar e publicar](#rodar-configurar-e-publicar)
 10. [Limitações conhecidas](#limitações-conhecidas)
 
 ---
@@ -87,11 +88,12 @@ Não há servidor próprio: o navegador fala direto com o Supabase. O GitHub Pag
 ```
 oficina-app/
 ├── index.html        Esqueleto da página: menu, área principal, tela de login, janela (modal) e aviso (toast).
-├── config.js         URL e chave pública do Supabase. Vazio = modo local (sem nuvem).
+├── config.js         URL e chave pública do Supabase (vazio = modo local) e endereço oficial do site.
 ├── app.js            O app em si: dados em memória, telas, formulários, regras de km e dono, backup e roteamento.
 ├── cloud.js          Login e sincronização com o Supabase. Inicia o app (boot).
 ├── style.css         Visual do app; inclui o layout de celular (barra inferior, listas em cartões).
 ├── sw.js             Service worker (cache dos arquivos para o PWA).
+├── version.json      Número da versão publicada (para o aviso "Nova versão disponível").
 ├── manifest.json     Nome, cores e ícones do app instalável.
 ├── icons/            Ícones do app (192, 512, maskable e apple-touch).
 ├── logo.png          Logo da barra lateral (fundo escuro).
@@ -236,6 +238,8 @@ registros (
 
 Cada cliente, veículo e serviço é **uma linha**, com o objeto inteiro no campo JSON `data`. Não existem colunas separadas para telefone, placa etc.: tudo fica dentro do `data`.
 
+Há também uma linha especial `tipo = 'sistema'`, `id = 'versao'`, com `{ "minima": N }`: a versão mínima do app que pode gravar (veja [Versões e atualizações](#versões-e-atualizações)).
+
 ### No navegador: o objeto `db`
 
 ```text
@@ -276,7 +280,40 @@ erDiagram
   - **arquivos do app:** busca primeiro na rede, para as atualizações chegarem logo, e usa a cópia guardada só sem sinal;
   - **biblioteca do Supabase (CDN):** usa a cópia guardada depois do primeiro uso;
   - **Supabase (login e dados):** nunca passa pelo cache; vai sempre direto à rede.
-- Ao mudar a lista de arquivos do `sw.js` ou a versão da biblioteca, **aumente o número em `CACHE`** (ex.: `oficina-v3` → `oficina-v4`).
+- **`version.json`** nunca passa pelo cache, para o aviso de versão nova ser sempre atual.
+- Ao mudar a lista de arquivos do `sw.js` ou a versão da biblioteca, **aumente o número em `CACHE`** (ex.: `oficina-v4` → `oficina-v5`).
+
+---
+
+## Versões e atualizações
+
+Como a publicação no GitHub Pages pode atrasar, e aparelhos podem ficar com o app antigo aberto, o app se protege contra versões desatualizadas de duas formas.
+
+**1. Aviso de versão nova.** O app sabe a própria versão (`APP_VERSAO` no `app.js`) e, ao voltar para a tela e a cada 5 minutos, lê o `version.json` do site. Se o site tiver um número maior, aparece "Nova versão do app disponível · Atualizar".
+
+**2. Trava de compatibilidade.** O banco guarda a versão mínima que pode gravar (linha `sistema|versao`). Antes de cada gravação, e na atualização automática, o app confere esse número. Se ele for mais antigo que o exigido, **não grava nada** e mostra a tela "Atualize o app".
+
+```mermaid
+sequenceDiagram
+  participant N as App novo (site oficial)
+  participant S as Supabase
+  participant A as App antigo (outro aparelho)
+  N->>S: ao abrir: grava sistema|versao = { minima: COMPAT_MINIMA }
+  A->>S: antes de gravar: lê sistema|versao
+  S-->>A: minima maior que a versão dele
+  A->>A: não grava e mostra "Atualize o app"
+```
+
+- **Só a versão aberta pelo endereço oficial** (`siteUrl` no `config.js`) sobe a versão mínima. Testar uma versão nova no computador (Live Server) **nunca** trava quem está usando o site, mesmo que a publicação demore.
+- A versão mínima só sobe quando a mudança **altera o formato dos dados**. Mudanças visuais ou de texto não travam ninguém; só mostram o aviso de versão nova.
+- A linha `sistema|versao` nunca é apagada pelo app.
+
+### Como publicar uma versão nova
+
+1. Aumente `APP_VERSAO` no `app.js` e o mesmo número no `version.json`.
+2. Se a mudança altera o formato dos dados (campos que somem ou mudam de significado, tipos novos que versões antigas estragariam), iguale também `COMPAT_MINIMA` a `APP_VERSAO`.
+3. Se mudou a lista de arquivos do `sw.js`, aumente o `CACHE`.
+4. Envie para a `main`. Quando o GitHub Pages publicar, quem estiver com o app aberto recebe o aviso; se `COMPAT_MINIMA` subiu, versões antigas ficam impedidas de gravar até atualizar.
 
 ---
 
@@ -320,4 +357,4 @@ Todo push na `main` publica automaticamente no GitHub Pages (Settings → Pages)
 - **Conflitos:** a sincronização é por registro e vale o último que salvou. Duas pessoas editando o mesmo serviço ao mesmo tempo podem sobrescrever uma à outra.
 - **Offline:** o app abre sem internet, mas o login e o carregamento dos dados precisam de conexão. Edições feitas sem rede ficam pendentes e se perdem se o app for fechado antes de sincronizar.
 - **Sem perfis de acesso:** qualquer usuário logado pode alterar e excluir tudo.
-- **Versões antigas abertas:** uma aba ou app instalado ainda com a versão anterior não conhece os serviços e pode apagá-los do banco ao salvar algo. Depois de atualizar, feche e abra o app em todos os aparelhos.
+- **Versões anteriores à 4** não têm a trava de compatibilidade. Uma aba ou app instalado ainda com elas (a versão com orçamentos) pode apagar serviços do banco ao salvar algo. Feche e abra o app em todos os aparelhos depois da publicação. A partir da versão 4, isso é bloqueado automaticamente.
