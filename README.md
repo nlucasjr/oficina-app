@@ -19,7 +19,7 @@ As imagens usam dados de exemplo (fictícios).
     <td align="center"><img src="docs/screenshots/celular-painel.png" width="200" alt="Painel com resumo do mês e últimos serviços"><br><sub><b>Painel</b><br>resumo do mês e últimos serviços</sub></td>
     <td align="center"><img src="docs/screenshots/celular-historico.png" width="200" alt="Ficha do veículo com o histórico de serviços"><br><sub><b>Histórico do veículo</b><br>data, km, mão de obra, peças, total e dono na época</sub></td>
     <td align="center"><img src="docs/screenshots/celular-servicos.png" width="200" alt="Lista de todos os serviços com busca"><br><sub><b>Serviços</b><br>todos os serviços, com busca</sub></td>
-    <td align="center"><img src="docs/screenshots/celular-registrar.png" width="200" alt="Formulário para registrar um serviço"><br><sub><b>Registrar serviço</b><br>mão de obra + peças = total, com atalhos para novo veículo e cliente</sub></td>
+    <td align="center"><img src="docs/screenshots/celular-registrar.png" width="200" alt="Formulário para registrar um serviço"><br><sub><b>Registrar serviço</b><br>mão de obra + peças = total, com seções de novo cliente e novo veículo</sub></td>
   </tr>
 </table>
 
@@ -65,7 +65,7 @@ Regras principais:
 - **Dono na época:** cada serviço guarda quem era o dono quando foi registrado. Se o carro for vendido (troca de dono no cadastro do veículo), o histórico continua mostrando o dono antigo nos serviços antigos ("Dono na época: …"), e a ficha do cliente antigo continua listando os serviços feitos para ele.
 - **Valores do serviço:** cada serviço tem **mão de obra** e **peças**; o **total** é a soma dos dois, calculada na hora no formulário. Os campos aceitam `235,50`, `1.234,56`, `R$ 80` ou `80.5`; um valor inválido é recusado com aviso. Painel, lista de serviços e ficha do veículo mostram os totais de mão de obra, peças e geral.
 - **Serviços registrados antes da divisão** (versão 5 ou anterior) só têm o total. Eles continuam somando no total geral; ao editar, o formulário mostra o total guardado e, se mão de obra e peças forem deixadas vazias, o total é mantido.
-- **Cadastro rápido no serviço:** o formulário de registrar serviço tem **+ Novo veículo** e **+ Novo cliente**. O que já foi digitado no serviço é guardado; ao salvar o cadastro, o app volta ao serviço com o veículo novo escolhido (no caso de cliente novo, abre em seguida o veículo dele). Cancelar volta para o serviço sem perder nada.
+- **Novo cliente e novo veículo no próprio serviço:** o formulário de registrar serviço tem duas seções que abrem e fecham, nesta ordem: **Novo cliente** e **Novo veículo**. Abrir "Novo veículo" dispensa escolher um veículo da lista; abrir "Novo cliente" abre também o veículo, já com o novo cliente como dono. Ao **Salvar**, o app valida tudo e só então cria o cliente, o veículo e o serviço, nessa ordem (nada fica criado pela metade). Sem clientes ou veículos cadastrados, as seções necessárias já abrem sozinhas.
 - **Botão voltar do celular:** com uma janela de edição aberta, o primeiro "voltar" fecha só a janela (ou volta para a janela anterior, nos cadastros em sequência), sem sair da tela.
 - **Pesquisa:** os campos de busca mostram só "Pesquisar", em cinza, com a lupa à direita.
 - **Exclusões protegidas:** um veículo com serviços no histórico não pode ser excluído, e um cliente que é dono de veículos ou aparece no histórico também não.
@@ -191,7 +191,7 @@ O endereço depois do `#` decide a tela (**roteamento por hash**). A função `r
 
 - **Botões** usam o atributo `data-act="nomeDaAcao"`. Um único ouvinte de clique em `app.js` procura esse atributo e chama a função correspondente no objeto `actions` (ex.: `novoServico`, `editVeiculo`, `exportar`).
 - **Cadastros e serviços** abrem num formulário em janela (`formModal`), que valida e devolve os valores. Tocar num serviço da lista ou do histórico abre a edição, com o botão Excluir.
-- **Janelas e o botão voltar:** ao abrir uma janela, o app cria um passo no histórico do navegador (`history.pushState`); o "voltar" do celular dispara `popstate` e fecha só a janela. Ao fechar pelo app (Salvar, Cancelar), esse passo é desfeito com `history.back()`. Janelas abertas a partir de outra (cadastro de veículo a partir do serviço) usam o mesmo passo e guardam a função `onCancel`, que leva de volta à janela anterior.
+- **Janelas e o botão voltar:** ao abrir uma janela, o app cria um passo no histórico do navegador (`history.pushState`); o "voltar" do celular dispara `popstate` e fecha só a janela. Ao fechar pelo app (Salvar, Cancelar), esse passo é desfeito com `history.back()`. Janelas abertas em sequência (ex.: em Veículos sem nenhum cliente, o app pede o cliente e depois o veículo) usam o mesmo passo; com a opção `onCancel`, Cancelar e voltar levam à janela anterior.
 - No celular, o menu vira uma **barra inferior** e as listas viram **cartões**.
 
 ### 3. Salvar e sincronizar

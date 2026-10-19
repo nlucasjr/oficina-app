@@ -10,7 +10,7 @@ const DB_KEY = "oficina_db_v1";
 // Se a mudança altera o formato dos dados (uma versão antiga estragaria ou
 // apagaria dados novos), iguale também COMPAT_MINIMA a APP_VERSAO: as versões
 // mais antigas que ela ficam impedidas de gravar até serem atualizadas.
-const APP_VERSAO = 6;
+const APP_VERSAO = 7;
 const COMPAT_MINIMA = 6;
 
 // ---------- utilidades ----------
@@ -360,9 +360,7 @@ const servicoFields = () => [
           l: [v.placa, nomeVeiculo(v), getCliente(v.clienteId)?.nome].filter(Boolean).join(" · "),
         })),
     ],
-    afterHTML: `<div class="field-actions">
-      <button type="button" class="btn sm" data-novo="veiculo">+ Novo veículo</button>
-      <button type="button" class="btn sm" data-novo="cliente">+ Novo cliente</button></div>`,
+    afterHTML: novosCadastrosHTML(),
   },
   { k: "data", label: "Data do serviço", type: "date", required: true },
   { k: "km", label: "Km no dia", type: "number", step: "1", ph: "Ex.: 85400" },
@@ -379,15 +377,108 @@ const servicoFields = () => [
   { k: "pecas", label: "Peças (R$)", type: "money", ph: "0,00" },
 ];
 
-// rascunho: valores já digitados no formulário (ao voltar de "Novo veículo"/"Novo cliente")
-function editServico(id, preset = {}, rascunho = null) {
-  if (!db.veiculos.length && !rascunho) {
-    toast("Cadastre um veículo primeiro");
-    return editVeiculo(null, {}, (vid) => editServico(null, { ...preset, veiculoId: vid }));
+/* "Novo cliente" e "Novo veículo" dentro do formulário de serviço: duas seções
+   que abrem e fecham (nessa ordem). Os campos delas não fazem parte do serviço;
+   ao Salvar, o app cria o cliente, depois o veículo e por fim o serviço. */
+function novosCadastrosHTML() {
+  const clientes = db.clientes.slice().sort((a, b) => a.nome.localeCompare(b.nome));
+  return `<details class="sub-form" id="dNovoCliente">
+      <summary>Novo cliente</summary>
+      <div class="grid">
+        <div class="full"><label>Nome *</label><input name="nc_nome" autocomplete="off"></div>
+        <div><label>Telefone *</label><input name="nc_telefone" type="tel" inputmode="tel" autocomplete="off" placeholder="(67) 98888-7777"></div>
+        <div><label>Endereço</label><input name="nc_endereco" autocomplete="off"></div>
+      </div>
+    </details>
+    <details class="sub-form" id="dNovoVeiculo">
+      <summary>Novo veículo</summary>
+      <div class="grid">
+        <div class="full"><label>Dono *</label><select name="nv_dono">
+          <option value="">— selecione —</option>
+          <option value="__novo__" hidden disabled>Novo cliente (acima)</option>
+          ${clientes.map((c) => `<option value="${esc(c.id)}">${esc(c.nome)}</option>`).join("")}
+        </select></div>
+        <div><label>Placa *</label><input name="nv_placa" autocomplete="off" placeholder="ABC1D23"></div>
+        <div><label>Marca</label><input name="nv_marca" autocomplete="off" placeholder="Volkswagen"></div>
+        <div class="full"><label>Modelo *</label><input name="nv_modelo" autocomplete="off" placeholder="Gol 1.0"></div>
+      </div>
+      <p class="hint">O serviço será registrado neste veículo novo.</p>
+    </details>`;
+}
+
+// Liga as seções: abrir "Novo veículo" dispensa a escolha do veículo; abrir
+// "Novo cliente" abre também o veículo, já com o novo cliente como dono.
+function ligarNovosCadastros() {
+  const dC = $("#dNovoCliente"),
+    dV = $("#dNovoVeiculo"),
+    sel = $('#mf [name="veiculoId"]'),
+    dono = $('#mf [name="nv_dono"]'),
+    optNovo = $('#mf [name="nv_dono"] option[value="__novo__"]');
+  const sync = () => {
+    sel.disabled = dV.open;
+    sel.required = !dV.open;
+    optNovo.hidden = optNovo.disabled = !dC.open;
+    if (dC.open && !dono.value) dono.value = "__novo__";
+    if (!dC.open && dono.value === "__novo__") dono.value = "";
+  };
+  dC.addEventListener("toggle", () => {
+    sync();
+    if (dC.open) {
+      dV.open = true;
+      dono.value = "__novo__";
+      setTimeout(() => $('#mf [name="nc_nome"]')?.focus(), 30);
+    }
+  });
+  dV.addEventListener("toggle", () => {
+    if (dV.open && !dC.open) setTimeout(() => { if (dV.isConnected) (dono.value ? $('#mf [name="nv_placa"]') : dono)?.focus(); }, 30);
+    sync();
+  });
+  sync();
+}
+
+// Lê e valida as seções abertas. Devolve { cliente, veiculo } (novos) ou null se inválido.
+function lerNovosCadastros(km) {
+  const val = (n) => ($(`#mf [name="${n}"]`)?.value || "").trim();
+  const abrirC = $("#dNovoCliente").open,
+    abrirV = $("#dNovoVeiculo").open;
+  let cliente = null,
+    veiculo = null;
+  if (abrirC) {
+    if (!val("nc_nome") || !val("nc_telefone")) {
+      alert("Novo cliente: informe nome e telefone.");
+      return null;
+    }
+    if (!abrirV) {
+      alert("Cadastre também o veículo do novo cliente.");
+      $("#dNovoVeiculo").open = true;
+      return null;
+    }
+    cliente = { id: uid(), nome: val("nc_nome"), telefone: val("nc_telefone"), endereco: val("nc_endereco"), criado: today() };
   }
+  if (abrirV) {
+    const dono = val("nv_dono");
+    const clienteId = dono === "__novo__" ? cliente?.id : getCliente(dono)?.id;
+    if (!clienteId) {
+      alert("Novo veículo: escolha o dono.");
+      return null;
+    }
+    const placa = val("nv_placa").toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (!placa || !val("nv_modelo")) {
+      alert("Novo veículo: informe placa e modelo.");
+      return null;
+    }
+    if (db.veiculos.some((x) => x.placa === placa)) {
+      alert("Já existe um veículo com essa placa. Escolha-o na lista de veículos.");
+      return null;
+    }
+    veiculo = { id: uid(), clienteId, placa, marca: val("nv_marca"), modelo: val("nv_modelo"), km: km === "" ? "" : km, criado: today() };
+  }
+  return { cliente, veiculo };
+}
+
+function editServico(id, preset = {}) {
   const s = id ? getServico(id) : { data: today(), ...preset };
   if (!s) return;
-  const dados = rascunho ? { ...s, ...rascunho } : s;
   // serviço registrado antes da divisão: mantém o total se os dois campos ficarem vazios
   const totalAntigo = id && !temDivisao(s) && temNum(s.valor) ? num(s.valor) : null;
   const extraHTML = `<div class="total-servico"><span>Total do serviço</span><b id="totalServico">—</b></div>
@@ -410,17 +501,20 @@ function editServico(id, preset = {}, rascunho = null) {
   formModal(
     id ? "Editar serviço" : "Registrar serviço",
     servicoFields(),
-    dados,
+    s,
     (vals) => {
-      const v = getVeiculo(vals.veiculoId);
+      const novos = lerNovosCadastros(vals.km);
+      if (!novos) return false;
+      const v = novos.veiculo || getVeiculo(vals.veiculoId);
       if (!v) {
-        alert("Escolha o veículo.");
+        alert("Escolha o veículo ou abra “Novo veículo” para cadastrar um.");
         return false;
       }
       if (!vals.descricao) {
         alert("Descreva o que foi feito.");
         return false;
       }
+      vals.veiculoId = v.id;
       // km menor que o de um serviço anterior costuma ser erro de digitação
       if (vals.km !== "") {
         const antes = db.servicos.filter(
@@ -436,6 +530,9 @@ function editServico(id, preset = {}, rascunho = null) {
         )
           return false;
       }
+      // tudo validado: grava cliente e veículo novos antes do serviço
+      if (novos.cliente) db.clientes.push(novos.cliente);
+      if (novos.veiculo) db.veiculos.push(novos.veiculo);
       // total = mão de obra + peças
       if (vals.maoDeObra === "" && vals.pecas === "") vals.valor = totalAntigo !== null ? totalAntigo : "";
       else vals.valor = arred(num(vals.maoDeObra) + num(vals.pecas));
@@ -451,29 +548,17 @@ function editServico(id, preset = {}, rascunho = null) {
       atualizarKm(v);
       if (veiculoAntes && veiculoAntes !== v) atualizarKm(veiculoAntes);
       save();
-      toast("Serviço salvo");
+      toast(
+        novos.cliente ? "Cliente, veículo e serviço salvos" : novos.veiculo ? "Veículo e serviço salvos" : "Serviço salvo",
+      );
       render();
     },
     { extraHTML, onInput, ...(id ? { onDelete: () => removeItem("servico", id) } : {}) },
   );
-  // "+ Novo veículo" e "+ Novo cliente": guardam o que já foi digitado, abrem o
-  // cadastro e, ao salvar, voltam para este serviço com o veículo novo escolhido.
-  // Cancelar (ou voltar) retorna para o serviço sem perder nada.
-  const lerRascunho = () => Object.fromEntries($$("#mf [name]").map((el) => [el.name, el.value]));
-  const voltar = (r) => () => editServico(id, preset, r);
-  const comVeiculo = (r) => (vid) => editServico(id, preset, { ...r, veiculoId: vid });
-  $('#mf [data-novo="veiculo"]').onclick = () => {
-    const r = lerRascunho();
-    editVeiculo(null, {}, comVeiculo(r), { onCancel: voltar(r) });
-  };
-  $('#mf [data-novo="cliente"]').onclick = () => {
-    const r = lerRascunho();
-    editCliente(
-      null,
-      (cid) => editVeiculo(null, { clienteId: cid }, comVeiculo(r), { onCancel: voltar(r) }),
-      { onCancel: voltar(r) },
-    );
-  };
+  ligarNovosCadastros();
+  // sem veículos (ou sem clientes) cadastrados: já abre as seções necessárias
+  if (!db.clientes.length) $("#dNovoCliente").open = true;
+  else if (!db.veiculos.length) $("#dNovoVeiculo").open = true;
 }
 
 function removeItem(kind, id) {
