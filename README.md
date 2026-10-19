@@ -17,9 +17,9 @@ As imagens usam dados de exemplo (fictícios).
 <table>
   <tr>
     <td align="center"><img src="docs/screenshots/celular-painel.png" width="200" alt="Painel com resumo do mês e últimos serviços"><br><sub><b>Painel</b><br>resumo do mês e últimos serviços</sub></td>
-    <td align="center"><img src="docs/screenshots/celular-historico.png" width="200" alt="Ficha do veículo com o histórico de serviços"><br><sub><b>Histórico do veículo</b><br>data, km, valor e dono na época</sub></td>
+    <td align="center"><img src="docs/screenshots/celular-historico.png" width="200" alt="Ficha do veículo com o histórico de serviços"><br><sub><b>Histórico do veículo</b><br>data, km, mão de obra, peças, total e dono na época</sub></td>
     <td align="center"><img src="docs/screenshots/celular-servicos.png" width="200" alt="Lista de todos os serviços com busca"><br><sub><b>Serviços</b><br>todos os serviços, com busca</sub></td>
-    <td align="center"><img src="docs/screenshots/celular-registrar.png" width="200" alt="Formulário para registrar um serviço"><br><sub><b>Registrar serviço</b><br>veículo, data, km, o que foi feito e valor</sub></td>
+    <td align="center"><img src="docs/screenshots/celular-registrar.png" width="200" alt="Formulário para registrar um serviço"><br><sub><b>Registrar serviço</b><br>mão de obra + peças = total, com atalhos para novo veículo e cliente</sub></td>
   </tr>
 </table>
 
@@ -56,13 +56,18 @@ As imagens usam dados de exemplo (fictícios).
 |---|---|
 | **Cliente** | nome, telefone, endereço |
 | **Veículo** | placa, marca, modelo, km atual e dono (um cliente) |
-| **Serviço** | veículo, data, km no dia, o que foi feito, valor e dono na época |
+| **Serviço** | veículo, data, km no dia, o que foi feito, valor de mão de obra, valor de peças, total e dono na época |
 
 Regras principais:
 
 - **Km atual do veículo** acompanha o serviço **mais recente** (pela data) que tenha km informado. Registrar, editar ou excluir um serviço recalcula o km. Um serviço lançado com data antiga não muda o km atual.
 - **Km menor que o anterior:** se um serviço tiver km menor do que o de um serviço anterior do mesmo carro, o app pergunta antes de salvar (costuma ser erro de digitação).
 - **Dono na época:** cada serviço guarda quem era o dono quando foi registrado. Se o carro for vendido (troca de dono no cadastro do veículo), o histórico continua mostrando o dono antigo nos serviços antigos ("Dono na época: …"), e a ficha do cliente antigo continua listando os serviços feitos para ele.
+- **Valores do serviço:** cada serviço tem **mão de obra** e **peças**; o **total** é a soma dos dois, calculada na hora no formulário. Os campos aceitam `235,50`, `1.234,56`, `R$ 80` ou `80.5`; um valor inválido é recusado com aviso. Painel, lista de serviços e ficha do veículo mostram os totais de mão de obra, peças e geral.
+- **Serviços registrados antes da divisão** (versão 5 ou anterior) só têm o total. Eles continuam somando no total geral; ao editar, o formulário mostra o total guardado e, se mão de obra e peças forem deixadas vazias, o total é mantido.
+- **Cadastro rápido no serviço:** o formulário de registrar serviço tem **+ Novo veículo** e **+ Novo cliente**. O que já foi digitado no serviço é guardado; ao salvar o cadastro, o app volta ao serviço com o veículo novo escolhido (no caso de cliente novo, abre em seguida o veículo dele). Cancelar volta para o serviço sem perder nada.
+- **Botão voltar do celular:** com uma janela de edição aberta, o primeiro "voltar" fecha só a janela (ou volta para a janela anterior, nos cadastros em sequência), sem sair da tela.
+- **Pesquisa:** os campos de busca mostram só "Pesquisar", em cinza, com a lupa à direita.
 - **Exclusões protegidas:** um veículo com serviços no histórico não pode ser excluído, e um cliente que é dono de veículos ou aparece no histórico também não.
 
 ---
@@ -186,6 +191,7 @@ O endereço depois do `#` decide a tela (**roteamento por hash**). A função `r
 
 - **Botões** usam o atributo `data-act="nomeDaAcao"`. Um único ouvinte de clique em `app.js` procura esse atributo e chama a função correspondente no objeto `actions` (ex.: `novoServico`, `editVeiculo`, `exportar`).
 - **Cadastros e serviços** abrem num formulário em janela (`formModal`), que valida e devolve os valores. Tocar num serviço da lista ou do histórico abre a edição, com o botão Excluir.
+- **Janelas e o botão voltar:** ao abrir uma janela, o app cria um passo no histórico do navegador (`history.pushState`); o "voltar" do celular dispara `popstate` e fecha só a janela. Ao fechar pelo app (Salvar, Cancelar), esse passo é desfeito com `history.back()`. Janelas abertas a partir de outra (cadastro de veículo a partir do serviço) usam o mesmo passo e guardam a função `onCancel`, que leva de volta à janela anterior.
 - No celular, o menu vira uma **barra inferior** e as listas viram **cartões**.
 
 ### 3. Salvar e sincronizar
@@ -247,7 +253,7 @@ db
 ├── config    { nome }
 ├── clientes  [ { id, nome, telefone, endereco, criado } ]
 ├── veiculos  [ { id, clienteId, placa, marca, modelo, km, criado } ]
-└── servicos  [ { id, veiculoId, clienteId, data, km, descricao, valor, criado } ]
+└── servicos  [ { id, veiculoId, clienteId, data, km, descricao, maoDeObra, pecas, valor, criado } ]
 ```
 
 ```mermaid
@@ -259,7 +265,8 @@ erDiagram
 
 - `servicos.clienteId` é o **dono na época** do serviço; `veiculos.clienteId` é o **dono atual**.
 - `veiculos.km` é o km atual; `servicos.km` é o km no dia do serviço.
-- `valor` e `km` podem ficar vazios.
+- `valor` é o **total** (`maoDeObra + pecas`), gravado para as somas. Serviços antigos podem ter só `valor`.
+- `maoDeObra`, `pecas`, `valor` e `km` podem ficar vazios.
 
 ---
 

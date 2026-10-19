@@ -10,8 +10,8 @@ const DB_KEY = "oficina_db_v1";
 // Se a mudança altera o formato dos dados (uma versão antiga estragaria ou
 // apagaria dados novos), iguale também COMPAT_MINIMA a APP_VERSAO: as versões
 // mais antigas que ela ficam impedidas de gravar até serem atualizadas.
-const APP_VERSAO = 5;
-const COMPAT_MINIMA = 4;
+const APP_VERSAO = 6;
+const COMPAT_MINIMA = 6;
 
 // ---------- utilidades ----------
 const $ = (s, el = document) => el.querySelector(s);
@@ -108,7 +108,13 @@ function atualizarKm(v) {
   const ult = servicosDoVeiculo(v.id).find((s) => temNum(s.km));
   if (ult) v.km = num(ult.km);
 }
+// Valores do serviço: maoDeObra + pecas = valor (total). O total fica gravado
+// em "valor" para as somas. Serviços registrados antes da divisão só têm o total.
 const totalValor = (list) => list.reduce((s, x) => s + num(x.valor), 0);
+const somaCampo = (list, k) => list.reduce((s, x) => s + num(x[k]), 0);
+const temDivisao = (s) => temNum(s.maoDeObra) || temNum(s.pecas);
+const arred = (n) => Math.round(n * 100) / 100;
+const valorOuTraco = (v) => (temNum(v) ? brl(v) : "—");
 
 function toast(msg) {
   const t = $("#toast");
@@ -121,9 +127,23 @@ const plate = (p) => (p ? `<span class="plate">${esc(p)}</span>` : "");
 const telLink = (t) =>
   t ? `<a href="tel:${esc(String(t).replace(/[^\d+]/g, ""))}">${esc(t)}</a>` : "—";
 
+// ---------- valores em dinheiro ----------
+// Lê "235,50", "1.234,56", "R$ 80" ou "80.5". Devolve "" se vazio e NaN se inválido.
+function lerDinheiro(txt) {
+  let s = String(txt ?? "").replace(/R\$|\s/gi, "");
+  if (!s) return "";
+  if (s.includes(",")) s = s.replace(/\./g, "").replace(",", ".");
+  else if (/^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, ""); // 1.234 = mil duzentos e trinta e quatro
+  if (!/^\d+(\.\d+)?$/.test(s)) return NaN;
+  return arred(parseFloat(s));
+}
+// número gravado vira "235,50"; texto ainda não salvo (rascunho) fica como foi digitado
+const dinheiroNoCampo = (v) =>
+  typeof v === "number" && !Number.isNaN(v) ? v.toFixed(2).replace(".", ",") : String(v ?? "");
+
 // ---------- formulários em janela ----------
 function fieldHTML(f, val) {
-  const v = val ?? f.default ?? "";
+  const v = f.type === "money" ? dinheiroNoCampo(val) : (val ?? f.default ?? "");
   const cls = f.full ? "full" : "";
   const req = f.required ? "required" : "";
   let input;
@@ -136,6 +156,9 @@ function fieldHTML(f, val) {
       .join("")}</select>`;
   } else if (f.type === "textarea") {
     input = `<textarea name="${f.k}" rows="${f.rows || 3}" ${req} placeholder="${esc(f.ph || "")}">${esc(v)}</textarea>`;
+  } else if (f.type === "money") {
+    // texto com teclado numérico: aceita vírgula em qualquer celular
+    input = `<input name="${f.k}" type="text" inputmode="decimal" autocomplete="off" value="${esc(v)}" ${req} placeholder="${esc(f.ph || "")}">`;
   } else {
     const extra =
       f.type === "number"
@@ -147,40 +170,99 @@ function fieldHTML(f, val) {
   }
   return `<div class="${cls}"><label>${esc(f.label)}${f.required ? " *" : ""}</label>${input}${
     f.hint ? `<div class="hint">${esc(f.hint)}</div>` : ""
-  }</div>`;
+  }${f.afterHTML || ""}</div>`;
 }
+
+/* Telas de edição (janelas) e o botão voltar do celular: ao abrir uma janela,
+   o app cria um passo no histórico do navegador. Voltar fecha a janela em vez
+   de sair da tela. Ao fechar pelo app (Salvar, Cancelar...), esse passo é
+   desfeito. Janelas abertas em sequência (ex.: cadastrar o cliente e depois o
+   veículo) usam o mesmo passo. */
+let modalGen = 0, // muda a cada janela aberta
+  modalHist = false, // existe um passo no histórico para a janela aberta
+  ignorarPop = false, // o próximo "voltar" foi feito pelo próprio app
+  modalVoltar = null; // janela aberta a partir de outra: Cancelar/voltar retorna para ela
 
 function formModal(title, fields, data, onSave, opts = {}) {
   const m = $("#modal");
+  const gen = ++modalGen;
+  modalVoltar = opts.onCancel || null;
+  if (!modalHist) {
+    history.pushState({ modal: true }, "", location.href);
+    modalHist = true;
+  }
   m.innerHTML = `<div class="modal-card"><h3>${esc(title)}</h3>
     <form id="mf"><div class="grid">${fields.map((f) => fieldHTML(f, data[f.k])).join("")}</div>
+    ${opts.extraHTML || ""}
     <div class="modal-actions">
       ${opts.onDelete ? `<button type="button" class="btn danger" data-del>Excluir</button><span class="grow"></span>` : ""}
       <button type="button" class="btn" data-close>Cancelar</button>
       <button class="btn primary">Salvar</button></div></form></div>`;
   m.classList.add("open");
-  $("[data-close]", m).onclick = closeModal;
+  $("[data-close]", m).onclick = cancelarJanela;
   if (opts.onDelete) $("[data-del]", m).onclick = opts.onDelete;
+  if (opts.onInput) {
+    $("#mf").addEventListener("input", opts.onInput);
+    opts.onInput();
+  }
   $("#mf").onsubmit = (e) => {
     e.preventDefault();
     const vals = {};
     for (const f of fields) {
       const el = $(`[name="${f.k}"]`, m);
-      vals[f.k] = f.type === "number" ? (el.value === "" ? "" : num(el.value)) : el.value.trim();
+      if (f.type === "money") {
+        vals[f.k] = lerDinheiro(el.value);
+        if (Number.isNaN(vals[f.k])) {
+          alert(`Valor inválido em "${f.label}". Use números, por exemplo 150 ou 235,50.`);
+          el.focus();
+          return;
+        }
+      } else vals[f.k] = f.type === "number" ? (el.value === "" ? "" : num(el.value)) : el.value.trim();
     }
-    if (onSave(vals) !== false) closeModal();
+    // se o salvar abriu outra janela (cadastro em sequência), ela continua aberta
+    if (onSave(vals) !== false && gen === modalGen) closeModal();
   };
   setTimeout(() => $("input,select,textarea", m)?.focus(), 30);
 }
-function closeModal() {
+function fecharJanela() {
   $("#modal").classList.remove("open");
   $("#modal").innerHTML = "";
 }
+function closeModal() {
+  if (!$("#modal").classList.contains("open")) return;
+  modalVoltar = null;
+  fecharJanela();
+  if (modalHist) {
+    modalHist = false;
+    ignorarPop = true;
+    history.back(); // desfaz o passo criado ao abrir
+  }
+}
+// Cancelar, tocar fora ou Esc: volta para a janela anterior, se houver; senão fecha
+function cancelarJanela() {
+  if (modalVoltar) modalVoltar();
+  else closeModal();
+}
+window.addEventListener("popstate", () => {
+  if (ignorarPop) {
+    ignorarPop = false;
+    return;
+  }
+  if (modalHist) {
+    // botão voltar do celular com a janela aberta: fecha só a janela
+    // (ou volta para a janela de onde ela foi aberta)
+    modalHist = false;
+    const voltar = modalVoltar;
+    modalVoltar = null;
+    fecharJanela();
+    if (voltar) voltar();
+  }
+});
 $("#modal").addEventListener("mousedown", (e) => {
-  if (e.target.id === "modal") closeModal();
+  if (e.target.id === "modal") cancelarJanela();
 });
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") closeModal();
+  if (e.key === "Escape" && $("#modal").classList.contains("open")) cancelarJanela();
 });
 
 // ---------- clientes ----------
@@ -189,7 +271,7 @@ const clienteFields = () => [
   { k: "telefone", label: "Telefone", type: "tel", required: true, ph: "(67) 98888-7777" },
   { k: "endereco", label: "Endereço", full: true },
 ];
-function editCliente(id, after) {
+function editCliente(id, after, opts = {}) {
   const c = id ? getCliente(id) : {};
   formModal(id ? "Editar cliente" : "Novo cliente", clienteFields(), c, (vals) => {
     if (id) Object.assign(c, vals);
@@ -201,7 +283,7 @@ function editCliente(id, after) {
     save();
     toast("Cliente salvo");
     after ? after(id || vals.id) : render();
-  });
+  }, opts);
 }
 
 // ---------- veículos ----------
@@ -231,10 +313,10 @@ const veiculoFields = () => [
     hint: "Atualiza sozinho a cada serviço registrado com km.",
   },
 ];
-function editVeiculo(id, preset = {}, after) {
+function editVeiculo(id, preset = {}, after, opts = {}) {
   if (!db.clientes.length) {
     toast("Cadastre o dono (cliente) primeiro");
-    return editCliente(null, () => editVeiculo(id, preset, after));
+    return editCliente(null, (cid) => editVeiculo(id, { ...preset, clienteId: cid }, after, opts), opts);
   }
   const v = id ? getVeiculo(id) : { ...preset };
   formModal(id ? "Editar veículo" : "Novo veículo", veiculoFields(), v, (vals) => {
@@ -257,7 +339,7 @@ function editVeiculo(id, preset = {}, after) {
     save();
     toast("Veículo salvo");
     after ? after(id || vals.id) : render();
-  });
+  }, opts);
 }
 
 // ---------- serviços ----------
@@ -278,6 +360,9 @@ const servicoFields = () => [
           l: [v.placa, nomeVeiculo(v), getCliente(v.clienteId)?.nome].filter(Boolean).join(" · "),
         })),
     ],
+    afterHTML: `<div class="field-actions">
+      <button type="button" class="btn sm" data-novo="veiculo">+ Novo veículo</button>
+      <button type="button" class="btn sm" data-novo="cliente">+ Novo cliente</button></div>`,
   },
   { k: "data", label: "Data do serviço", type: "date", required: true },
   { k: "km", label: "Km no dia", type: "number", step: "1", ph: "Ex.: 85400" },
@@ -290,20 +375,42 @@ const servicoFields = () => [
     full: true,
     ph: "Ex.: Troca de óleo 5W30 e filtro de óleo",
   },
-  { k: "valor", label: "Valor (R$)", type: "number", step: "0.01", ph: "0,00" },
+  { k: "maoDeObra", label: "Mão de obra (R$)", type: "money", ph: "0,00" },
+  { k: "pecas", label: "Peças (R$)", type: "money", ph: "0,00" },
 ];
 
-function editServico(id, preset = {}) {
-  if (!db.veiculos.length) {
+// rascunho: valores já digitados no formulário (ao voltar de "Novo veículo"/"Novo cliente")
+function editServico(id, preset = {}, rascunho = null) {
+  if (!db.veiculos.length && !rascunho) {
     toast("Cadastre um veículo primeiro");
-    return editVeiculo(null, {}, (vid) => editServico(null, { veiculoId: vid }));
+    return editVeiculo(null, {}, (vid) => editServico(null, { ...preset, veiculoId: vid }));
   }
   const s = id ? getServico(id) : { data: today(), ...preset };
   if (!s) return;
+  const dados = rascunho ? { ...s, ...rascunho } : s;
+  // serviço registrado antes da divisão: mantém o total se os dois campos ficarem vazios
+  const totalAntigo = id && !temDivisao(s) && temNum(s.valor) ? num(s.valor) : null;
+  const extraHTML = `<div class="total-servico"><span>Total do serviço</span><b id="totalServico">—</b></div>
+    ${
+      totalAntigo !== null
+        ? `<p class="hint">Registrado antes da divisão, com total de ${brl(totalAntigo)}. Preencha mão de obra e peças para dividir; deixando os dois vazios, o total é mantido.</p>`
+        : ""
+    }`;
+  const onInput = () => {
+    const mo = lerDinheiro($('#mf [name="maoDeObra"]').value),
+      pc = lerDinheiro($('#mf [name="pecas"]').value);
+    const vazio = mo === "" && pc === "";
+    const ok = (x) => (Number.isNaN(x) || x === "" ? 0 : x);
+    $("#totalServico").textContent = vazio
+      ? totalAntigo !== null
+        ? brl(totalAntigo)
+        : "—"
+      : brl(ok(mo) + ok(pc));
+  };
   formModal(
     id ? "Editar serviço" : "Registrar serviço",
     servicoFields(),
-    s,
+    dados,
     (vals) => {
       const v = getVeiculo(vals.veiculoId);
       if (!v) {
@@ -329,6 +436,9 @@ function editServico(id, preset = {}) {
         )
           return false;
       }
+      // total = mão de obra + peças
+      if (vals.maoDeObra === "" && vals.pecas === "") vals.valor = totalAntigo !== null ? totalAntigo : "";
+      else vals.valor = arred(num(vals.maoDeObra) + num(vals.pecas));
       // dono na época: o dono atual do veículo quando o serviço é registrado
       const veiculoAntes = id ? getVeiculo(s.veiculoId) : null;
       if (!id || s.veiculoId !== vals.veiculoId || !s.clienteId) vals.clienteId = v.clienteId;
@@ -344,8 +454,26 @@ function editServico(id, preset = {}) {
       toast("Serviço salvo");
       render();
     },
-    id ? { onDelete: () => removeItem("servico", id) } : {},
+    { extraHTML, onInput, ...(id ? { onDelete: () => removeItem("servico", id) } : {}) },
   );
+  // "+ Novo veículo" e "+ Novo cliente": guardam o que já foi digitado, abrem o
+  // cadastro e, ao salvar, voltam para este serviço com o veículo novo escolhido.
+  // Cancelar (ou voltar) retorna para o serviço sem perder nada.
+  const lerRascunho = () => Object.fromEntries($$("#mf [name]").map((el) => [el.name, el.value]));
+  const voltar = (r) => () => editServico(id, preset, r);
+  const comVeiculo = (r) => (vid) => editServico(id, preset, { ...r, veiculoId: vid });
+  $('#mf [data-novo="veiculo"]').onclick = () => {
+    const r = lerRascunho();
+    editVeiculo(null, {}, comVeiculo(r), { onCancel: voltar(r) });
+  };
+  $('#mf [data-novo="cliente"]').onclick = () => {
+    const r = lerRascunho();
+    editCliente(
+      null,
+      (cid) => editVeiculo(null, { clienteId: cid }, comVeiculo(r), { onCancel: voltar(r) }),
+      { onCancel: voltar(r) },
+    );
+  };
 }
 
 function removeItem(kind, id) {
@@ -382,8 +510,8 @@ function removeItem(kind, id) {
 function servicoTabela(list, { veiculo = true, dono = true, vazio = "Nenhum serviço registrado" } = {}) {
   const head = `<tr><th>Data</th>${veiculo ? "<th>Veículo</th>" : ""}<th>Serviço</th><th>Km</th>${
     dono ? "<th>Dono na época</th>" : ""
-  }<th class="num">Valor</th></tr>`;
-  const cols = 4 + (veiculo ? 1 : 0) + (dono ? 1 : 0);
+  }<th class="num">Mão de obra</th><th class="num">Peças</th><th class="num">Total</th></tr>`;
+  const cols = 6 + (veiculo ? 1 : 0) + (dono ? 1 : 0);
   const rows = list.length
     ? ordenarServicos(list)
         .map((s) => {
@@ -395,12 +523,20 @@ function servicoTabela(list, { veiculo = true, dono = true, vazio = "Nenhum serv
         <td class="c1 desc"><span class="clamp">${esc(s.descricao)}</span></td>
         <td class="c1 sub nowrap" data-l="Km">${kmFmt(s.km)}</td>
         ${dono ? `<td class="c1 sub" data-l="Dono">${esc(c?.nome || "—")}</td>` : ""}
-        <td class="num c2 o-1 nowrap"><b>${temNum(s.valor) ? brl(s.valor) : "—"}</b></td></tr>`;
+        <td class="num c1 sub nowrap ${temDivisao(s) ? "" : "hide-sm"}" data-l="Mão de obra">${valorOuTraco(s.maoDeObra)}</td>
+        <td class="num c1 sub nowrap ${temDivisao(s) ? "" : "hide-sm"}" data-l="Peças">${valorOuTraco(s.pecas)}</td>
+        <td class="num c2 o-1 nowrap"><b>${valorOuTraco(s.valor)}</b></td></tr>`;
         })
         .join("")
     : `<tr><td colspan="${cols}" class="empty">${vazio}</td></tr>`;
   return `<div class="table-wrap"><table class="list"><thead>${head}</thead><tbody>${rows}</tbody></table></div>`;
 }
+
+// Campo de pesquisa: só "Pesquisar" como dica e a lupa à direita
+const campoBusca = (valor) => `<div class="toolbar"><div class="busca">
+  <input id="fBusca" type="search" enterkeyhint="search" autocomplete="off" placeholder="Pesquisar" aria-label="Pesquisar" value="${esc(valor || "")}">
+  <svg class="busca-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg>
+</div></div>`;
 
 const btnServico = (vid = "", txt = "+ Registrar serviço", cls = "btn primary") =>
   `<button class="${cls}" data-act="novoServico" data-veiculo="${esc(vid)}">${txt}</button>`;
@@ -415,6 +551,8 @@ const views = {
         <div class="stat"><div class="l">Clientes</div><div class="v">${db.clientes.length}</div></div>
         <div class="stat"><div class="l">Serviços no mês</div><div class="v">${doMes.length}</div></div>
         <div class="stat"><div class="l">Faturado no mês</div><div class="v">${brl(totalValor(doMes))}</div></div>
+        <div class="stat"><div class="l">Mão de obra no mês</div><div class="v">${brl(somaCampo(doMes, "maoDeObra"))}</div></div>
+        <div class="stat"><div class="l">Peças no mês</div><div class="v">${brl(somaCampo(doMes, "pecas"))}</div></div>
       </div>
       <div class="card"><div class="page-head" style="margin-bottom:8px"><h2>Últimos serviços</h2>
         <a class="btn sm" href="#servicos">Ver todos</a></div>
@@ -430,8 +568,10 @@ const views = {
       return norm(`${v?.placa} ${nomeVeiculo(v)} ${c?.nome} ${s.descricao} ${fmtDate(s.data)}`).includes(busca);
     });
     return `<div class="page-head"><h1>Serviços</h1>${btnServico()}</div>
-      <div class="toolbar"><input id="fBusca" type="search" placeholder="Buscar placa, modelo, cliente, serviço..." value="${esc(q.q || "")}"></div>
-      <p class="muted resumo">${list.length} ${list.length === 1 ? "serviço" : "serviços"} · ${brl(totalValor(list))}</p>
+      ${campoBusca(q.q)}
+      <p class="muted resumo">${list.length} ${list.length === 1 ? "serviço" : "serviços"} · Mão de obra ${brl(
+        somaCampo(list, "maoDeObra"),
+      )} · Peças ${brl(somaCampo(list, "pecas"))} · <b>Total ${brl(totalValor(list))}</b></p>
       <div class="card">${servicoTabela(list, { vazio: busca ? "Nenhum serviço encontrado" : "Nenhum serviço registrado" })}</div>`;
   },
 
@@ -441,7 +581,7 @@ const views = {
       .filter((v) => !busca || norm(`${v.placa} ${nomeVeiculo(v)} ${getCliente(v.clienteId)?.nome}`).includes(busca))
       .sort((a, b) => a.placa.localeCompare(b.placa));
     return `<div class="page-head"><h1>Veículos</h1><button class="btn primary" data-act="novoVeiculo">+ Novo veículo</button></div>
-      <div class="toolbar"><input id="fBusca" type="search" placeholder="Buscar placa, marca, modelo, dono..." value="${esc(q.q || "")}"></div>
+      ${campoBusca(q.q)}
       <div class="card"><div class="table-wrap"><table class="list">
       <thead><tr><th>Placa</th><th>Veículo</th><th>Dono</th><th>Km atual</th><th>Último serviço</th></tr></thead><tbody>
       ${
@@ -477,6 +617,7 @@ const views = {
         <div><span>Telefone</span>${telLink(c?.telefone)}</div>
         <div><span>Km atual</span>${kmFmt(v.km)}</div>
         <div><span>Serviços</span>${hist.length} · ${brl(totalValor(hist))}</div>
+        <div><span>Mão de obra / Peças</span>${brl(somaCampo(hist, "maoDeObra"))} / ${brl(somaCampo(hist, "pecas"))}</div>
       </div></div>
       <div class="card"><h2>Histórico de serviços</h2>
       ${
@@ -488,6 +629,7 @@ const views = {
           <div class="tl-head"><b>${fmtDate(s.data)}</b><span class="muted">${kmFmt(s.km)}</span>
             <b class="tl-valor">${temNum(s.valor) ? brl(s.valor) : ""}</b></div>
           <div class="tl-desc">${esc(s.descricao)}</div>
+          ${temDivisao(s) ? `<div class="muted tl-partes">Mão de obra ${valorOuTraco(s.maoDeObra)} · Peças ${valorOuTraco(s.pecas)}</div>` : ""}
           ${s.clienteId && s.clienteId !== v.clienteId ? `<div class="muted tl-dono">Dono na época: ${esc(dono?.nome || "—")}</div>` : ""}
         </div>`;
               })
@@ -503,7 +645,7 @@ const views = {
       .filter((c) => !busca || norm(`${c.nome} ${c.telefone} ${c.endereco}`).includes(busca))
       .sort((a, b) => a.nome.localeCompare(b.nome));
     return `<div class="page-head"><h1>Clientes</h1><button class="btn primary" data-act="novoCliente">+ Novo cliente</button></div>
-      <div class="toolbar"><input id="fBusca" type="search" placeholder="Buscar nome, telefone, endereço..." value="${esc(q.q || "")}"></div>
+      ${campoBusca(q.q)}
       <div class="card"><div class="table-wrap"><table class="list">
       <thead><tr><th>Nome</th><th>Telefone</th><th>Veículos</th><th class="num">Serviços</th></tr></thead><tbody>
       ${

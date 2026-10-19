@@ -95,6 +95,20 @@ table.list td.desc { max-width: 420px; }
 .tl-valor { margin-left: auto; }
 .tl-desc { margin-top: 4px; white-space: pre-line; overflow-wrap: anywhere; }
 .tl-dono { font-size: 13px; margin-top: 4px; }
+.tl-partes { font-size: 13px; margin-top: 4px; }
+.field-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+
+/* Campo de pesquisa com a lupa à direita */
+.busca { position: relative; flex: 1 1 340px; max-width: 340px; }
+.busca input { width: 100%; max-width: none; padding-right: 42px; -webkit-appearance: none; appearance: none; }
+.busca input::placeholder { color: #9aa1af; opacity: 1; }
+.busca input::-webkit-search-cancel-button, .busca input::-webkit-search-decoration { -webkit-appearance: none; appearance: none; }
+.busca-ico { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); width: 20px; height: 20px;
+  fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; pointer-events: none; }
+.total-servico { display: flex; justify-content: space-between; align-items: baseline; margin-top: 14px; padding: 12px 14px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; }
+.total-servico b { font-size: 20px; }
+.total-servico + .hint { margin-top: 8px; }
 
 .modal { position: fixed; inset: 0; background: rgba(20,24,33,.5); display: none; align-items: flex-start; justify-content: center; padding: 40px 16px; overflow-y: auto; z-index: 50; }
 .modal.open { display: flex; }
@@ -177,7 +191,11 @@ table.list td.desc { max-width: 420px; }
   .btn { min-height: 44px; padding: 10px 14px; }
   .btn.sm { min-height: 38px; padding: 7px 12px; font-size: 14px; }
   .grid { grid-template-columns: 1fr; gap: 12px; }
+  #mf .grid:has([name="maoDeObra"]) { grid-template-columns: 1fr 1fr; }
+  #mf .grid:has([name="maoDeObra"]) > div:not(:has([name="maoDeObra"])):not(:has([name="pecas"])) { grid-column: 1 / -1; }
   .toolbar input, .toolbar select { max-width: none; flex: 1 1 100%; }
+  .busca { max-width: none; flex: 1 1 100%; }
+  table.list td.c1.num { text-align: left; }
 
   /* listas viram cartões: coluna da esquerda (principal) e da direita (valores) */
   table.list, table.list tbody { display: block; }
