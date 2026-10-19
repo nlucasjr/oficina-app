@@ -36,17 +36,17 @@ As imagens usam dados de exemplo (fictícios).
 ## Sumário
 
 1. [Telas](#telas)
-1. [O que o app guarda](#o-que-o-app-guarda)
-2. [Tecnologias](#tecnologias)
-3. [Estrutura dos arquivos](#estrutura-dos-arquivos)
-4. [Visão geral da arquitetura](#visão-geral-da-arquitetura)
-5. [Como as partes se comunicam](#como-as-partes-se-comunicam)
-6. [Modelo de dados](#modelo-de-dados)
-7. [Segurança e usuários](#segurança-e-usuários)
-8. [PWA e service worker](#pwa-e-service-worker)
-9. [Versões e atualizações](#versões-e-atualizações)
-1. [Rodar, configurar e publicar](#rodar-configurar-e-publicar)
-10. [Limitações conhecidas](#limitações-conhecidas)
+2. [O que o app guarda](#o-que-o-app-guarda)
+3. [Tecnologias](#tecnologias)
+4. [Estrutura dos arquivos](#estrutura-dos-arquivos)
+5. [Visão geral da arquitetura](#visão-geral-da-arquitetura)
+6. [Como as partes se comunicam](#como-as-partes-se-comunicam)
+7. [Modelo de dados](#modelo-de-dados)
+8. [Segurança e usuários](#segurança-e-usuários)
+9. [PWA e service worker](#pwa-e-service-worker)
+10. [Versões e atualizações](#versões-e-atualizações)
+11. [Rodar, configurar e publicar](#rodar-configurar-e-publicar)
+12. [Limitações conhecidas](#limitações-conhecidas)
 
 ---
 
