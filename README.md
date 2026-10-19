@@ -8,8 +8,34 @@ Aplicativo web para a oficina manter o **histórico de serviços de cada veícul
 
 ---
 
+## Telas
+
+As imagens usam dados de exemplo (fictícios).
+
+### No celular
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/screenshots/celular-painel.png" width="200" alt="Painel com resumo do mês e últimos serviços"><br><sub><b>Painel</b><br>resumo do mês e últimos serviços</sub></td>
+    <td align="center"><img src="docs/screenshots/celular-historico.png" width="200" alt="Ficha do veículo com o histórico de serviços"><br><sub><b>Histórico do veículo</b><br>data, km, valor e dono na época</sub></td>
+    <td align="center"><img src="docs/screenshots/celular-servicos.png" width="200" alt="Lista de todos os serviços com busca"><br><sub><b>Serviços</b><br>todos os serviços, com busca</sub></td>
+    <td align="center"><img src="docs/screenshots/celular-registrar.png" width="200" alt="Formulário para registrar um serviço"><br><sub><b>Registrar serviço</b><br>veículo, data, km, o que foi feito e valor</sub></td>
+  </tr>
+</table>
+
+### No computador
+
+<p align="center"><img src="docs/screenshots/computador-historico.png" width="800" alt="Ficha do veículo com o histórico de serviços no computador"></p>
+<p align="center"><sub><b>Histórico do veículo</b>: o serviço de 20/11/2025 mostra o dono da época, porque o carro mudou de dono depois.</sub></p>
+
+<p align="center"><img src="docs/screenshots/computador-servicos.png" width="800" alt="Lista de serviços no computador"></p>
+<p align="center"><sub><b>Serviços</b>: todos os serviços da oficina, do mais recente para o mais antigo.</sub></p>
+
+---
+
 ## Sumário
 
+1. [Telas](#telas)
 1. [O que o app guarda](#o-que-o-app-guarda)
 2. [Tecnologias](#tecnologias)
 3. [Estrutura dos arquivos](#estrutura-dos-arquivos)
@@ -70,6 +96,7 @@ oficina-app/
 ├── icons/            Ícones do app (192, 512, maskable e apple-touch).
 ├── logo.png          Logo da barra lateral (fundo escuro).
 ├── logo-branco.png   Logo da tela de login (fundo branco).
+├── docs/screenshots/ Imagens das telas usadas neste README.
 └── supabase.sql      Script que cria a tabela e as regras de acesso no Supabase.
 ```
 
