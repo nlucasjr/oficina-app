@@ -1,10 +1,10 @@
 /* Service worker do app Oficina.
    - Arquivos do app: tenta a rede primeiro (assim as atualizações chegam logo)
      e usa a cópia guardada só quando estiver sem sinal.
-   - Bibliotecas de CDN (PDF e Supabase): ficam guardadas depois do primeiro uso.
+   - Biblioteca do Supabase (CDN): fica guardada depois do primeiro uso.
    - Supabase (login e dados): nunca passa pelo cache, vai sempre direto para a rede.
    Ao mudar a lista de arquivos ou as versões das bibliotecas, aumente o número em CACHE. */
-const CACHE = 'oficina-v2';
+const CACHE = 'oficina-v3';
 
 const SHELL = [
   './', 'index.html', 'style.css', 'config.js', 'app.js', 'cloud.js',
@@ -12,11 +12,9 @@ const SHELL = [
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',
 ];
 const CDN = [
-  'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js',
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.min.js',
 ];
-const CDN_HOSTS = ['cdnjs.cloudflare.com', 'cdn.jsdelivr.net'];
+const CDN_HOSTS = ['cdn.jsdelivr.net'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil((async () => {

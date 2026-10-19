@@ -71,11 +71,6 @@ tr.click:hover td { background: var(--surface-2); }
 td.num, th.num { text-align: right; }
 .empty { text-align: center; color: var(--muted); padding: 30px; }
 
-.badge { display: inline-block; font-size: 12px; padding: 3px 9px; border-radius: 99px; font-weight: 600; }
-.b-aberto { background: #fff4e6; color: var(--warn); }
-.b-aprovado { background: #e7f5ff; color: var(--info); }
-.b-recusado { background: #fff5f5; color: var(--bad); }
-.b-concluido { background: #ebfbee; color: var(--ok); }
 .plate { font-family: ui-monospace, Menlo, monospace; background: #fff; border: 2px solid var(--text); border-radius: 4px; padding: 1px 6px; font-weight: 700; letter-spacing: .05em; font-size: 13px; }
 
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
@@ -83,31 +78,23 @@ td.num, th.num { text-align: right; }
 .info-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px 20px; }
 .info-list div span { display: block; font-size: 12px; color: var(--muted); }
 
-/* Editor de orçamento */
-.items td { padding: 6px 4px; }
-.items input, .items select { padding: 7px 8px; }
-.items .w-qtd { width: 80px; }
-.items .w-val { width: 120px; }
-.items .it-desc { min-width: 240px; }
-.it-sub-l { display: none; }
-.tag { display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 99px; white-space: nowrap; }
-.t-peca { background: #fff4e6; color: #d9480f; }
-.t-serv { background: #e7f5ff; color: var(--info); }
-.resp-cliente { border-left: 5px solid; padding: 12px 16px; }
-.resp-ok { border-left-color: var(--ok); background: #ebfbee; }
-.resp-no { border-left-color: var(--bad); background: #fff5f5; }
-.editor-foot { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 16px; align-items: flex-start; }
-.editor-foot > .grid { flex: 1; min-width: 240px; }
-.totals { margin-left: auto; max-width: 380px; }
-.totals div { display: flex; justify-content: space-between; padding: 6px 0; }
-.totals .grand { font-size: 20px; font-weight: 700; border-top: 2px solid var(--text); margin-top: 6px; padding-top: 10px; }
-.totals .internal { color: var(--muted); font-size: 13px; }
-.sticky-actions { position: sticky; bottom: 0; background: var(--bg); padding: 12px 0; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; border-top: 1px solid var(--border); }
+/* Serviços */
+.hint { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+.resumo { margin: -4px 0 12px; font-size: 14px; }
+.nowrap { white-space: nowrap; }
+table.list td.desc { max-width: 420px; }
+.clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-line; }
+.grow { flex: 1; }
 
 .timeline { border-left: 2px solid var(--border); margin-left: 6px; padding-left: 18px; }
-.tl-item { position: relative; margin-bottom: 18px; }
-.tl-item::before { content: ""; position: absolute; left: -25px; top: 5px; width: 12px; height: 12px; border-radius: 50%; background: var(--primary); }
-.tl-item ul { margin: 6px 0 0; padding-left: 18px; color: var(--muted); font-size: 14px; }
+.tl-item { position: relative; margin: 0 0 10px -8px; padding: 8px; border-radius: 8px; }
+.tl-item::before { content: ""; position: absolute; left: -17px; top: 13px; width: 12px; height: 12px; border-radius: 50%; background: var(--primary); }
+.tl-item.click { cursor: pointer; }
+.tl-item.click:hover { background: var(--surface-2); }
+.tl-head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.tl-valor { margin-left: auto; }
+.tl-desc { margin-top: 4px; white-space: pre-line; overflow-wrap: anywhere; }
+.tl-dono { font-size: 13px; margin-top: 4px; }
 
 .modal { position: fixed; inset: 0; background: rgba(20,24,33,.5); display: none; align-items: flex-start; justify-content: center; padding: 40px 16px; overflow-y: auto; z-index: 50; }
 .modal.open { display: flex; }
@@ -150,7 +137,7 @@ td.num, th.num { text-align: right; }
   #userBox { margin: 0; max-width: 58vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; word-break: normal; }
 
   /* barra de navegação inferior */
-  nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr));
+  nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr);
     height: calc(var(--nav-h) + var(--safe-b)); padding: 0 2px var(--safe-b); background: var(--side);
     border-top: 1px solid rgba(255,255,255,.08); box-shadow: 0 -4px 16px rgba(0,0,0,.18); }
   nav a { height: var(--nav-h); margin: 0; padding: 6px 0 4px; border-radius: 0; flex-direction: column; justify-content: center; gap: 3px;
@@ -161,7 +148,6 @@ td.num, th.num { text-align: right; }
   nav a.active .ico { background: var(--primary); }
 
   main { padding: 16px 14px calc(var(--nav-h) + var(--safe-b) + 24px); }
-  main:has(.sticky-actions) { padding-bottom: calc(var(--nav-h) + var(--safe-b)); }
   .toast { bottom: calc(var(--nav-h) + var(--safe-b) + 14px); }
   h1 { font-size: 21px; }
   .page-head { margin-bottom: 14px; }
@@ -197,40 +183,11 @@ td.num, th.num { text-align: right; }
   table.list .o-1 { order: -1; }
   table.list td[data-l]::before { content: attr(data-l) ": "; }
   table.list td.empty { grid-column: 1 / -1; padding: 22px 0; }
-  table.list .row-actions { grid-column: 1 / -1; margin-top: 6px; }
   tr.click:hover td { background: none; }
   tr.click:active { background: var(--surface-2); }
 
-  /* editor de orçamento: cada item vira um cartão */
-  .items-head .actions { width: 100%; }
-  .items-head .actions .btn { flex: 1 1 0; justify-content: center; white-space: normal; text-align: center; }
-  .items, .items tbody { display: block; }
-  .items thead { display: none; }
-  .items tr { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding: 12px; margin-bottom: 10px;
-    border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); }
-  .items td { padding: 0; border: 0; min-width: 0; }
-  .items .it-tipo { grid-column: 1 / 3; grid-row: 1; align-self: center; }
-  .items .it-rm { grid-column: 3; grid-row: 1; justify-self: end; }
-  .items .it-desc { grid-column: 1 / -1; min-width: 0; }
-  .items .it-desc select { margin-bottom: 8px !important; }
-  .items .it-desc select, .items .it-desc input { width: 100%; }
-  .items .it-qtd { grid-column: 1; }
-  .items .it-custo { grid-column: 2; }
-  .items .it-valor { grid-column: 3; }
-  .items .w-qtd, .items .w-val { width: 100%; }
-  .items input, .items select { padding: 10px; }
-  .items td[data-l]::before { content: attr(data-l); display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
-  .items .it-custo > .muted { display: flex; align-items: center; min-height: 46px; padding-left: 4px; }
-  .items .it-sub { grid-column: 1 / -1; text-align: right; border-top: 1px dashed var(--border); padding-top: 8px; }
-  .it-sub-l { display: inline; color: var(--muted); font-size: 13px; }
-  .items td.empty { grid-column: 1 / -1; }
-  .editor-foot > .grid { flex-basis: 100%; min-width: 0; }
-  .totals { max-width: none; width: 100%; margin: 0; }
-
-  /* botões do orçamento ficam fixos logo acima da barra inferior */
-  .sticky-actions { bottom: calc(var(--nav-h) + var(--safe-b)); margin: 0 -14px; padding: 10px 14px; display: grid;
-    grid-template-columns: 0.8fr 1.2fr 1fr; gap: 8px; z-index: 20; box-shadow: 0 -4px 12px rgba(0,0,0,.06); }
-  .sticky-actions .btn { justify-content: center; padding: 10px 6px; }
+  table.list td.desc { max-width: none; }
+  .tl-valor { margin-left: auto; }
 
   /* formulários em janela: abrem como uma folha vinda de baixo */
   .modal { padding: 0; align-items: flex-end; overflow: hidden; }
@@ -239,4 +196,5 @@ td.num, th.num { text-align: right; }
   .modal-card .modal-actions { position: sticky; bottom: 0; background: var(--surface); margin: 16px -16px 0;
     padding: 12px 16px calc(12px + var(--safe-b)); border-top: 1px solid var(--border); }
   .modal-actions .btn { flex: 1; justify-content: center; }
+  .modal-actions .grow { display: none; }
 }

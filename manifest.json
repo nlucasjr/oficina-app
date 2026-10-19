@@ -1,7 +1,7 @@
 {
-  "name": "Mecânica Rodrigues — Gestão",
+  "name": "Mecânica Rodrigues — Histórico de serviços",
   "short_name": "Oficina",
-  "description": "Gestão de clientes, veículos, peças e orçamentos da oficina.",
+  "description": "Histórico de serviços dos veículos, seus donos, datas e quilometragem.",
   "id": "./",
   "start_url": "./",
   "scope": "./",

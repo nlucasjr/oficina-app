@@ -1,10 +1,13 @@
 /* Login e sincronização com Supabase.
-   Cada cliente, veículo, peça e orçamento é uma linha da tabela "registros".
+   Cada cliente, veículo e serviço é uma linha da tabela "registros".
    Só as linhas que mudaram são enviadas, então dois computadores podem
    trabalhar ao mesmo tempo sem apagar o que o outro fez.
+   Linhas de tipos que o app não usa mais (orçamentos e peças da versão
+   anterior) são ignoradas; o supabase.sql as apaga do banco.
    Sem config.js preenchido, o app roda em modo local (só neste navegador). */
 
-const TIPOS = ['clientes', 'veiculos', 'pecas', 'orcamentos'];
+const TIPOS = ['clientes', 'veiculos', 'servicos'];
+const conhecido = (tipo) => tipo === 'config' || TIPOS.includes(tipo);
 const CFG = window.OFICINA_CONFIG || {};
 
 const cloud = {
@@ -69,11 +72,13 @@ const cloud = {
     return rows;
   },
 
+  // Monta o db a partir das linhas do banco
   apply(rows) {
     const d = blankDB(), synced = new Map();
     for (const r of rows) {
+      if (!conhecido(r.tipo)) continue; // tipos antigos: ignorados e nunca apagados por aqui
       if (r.tipo === 'config') d.config = { ...d.config, ...r.data };
-      else if (TIPOS.includes(r.tipo)) d[r.tipo].push(r.data);
+      else d[r.tipo].push(r.data);
       synced.set(r.tipo + '|' + r.id, JSON.stringify(r.data));
     }
     db = d; cloud.synced = synced;
@@ -87,19 +92,11 @@ const cloud = {
       const rows = await cloud.pull();
       if (cloud.dirty) return;
       const before = JSON.stringify([...cloud.synced].sort());
-      const after = JSON.stringify(rows.map(r => [r.tipo + '|' + r.id, JSON.stringify(r.data)]).sort());
+      const after = JSON.stringify(rows.filter(r => conhecido(r.tipo))
+        .map(r => [r.tipo + '|' + r.id, JSON.stringify(r.data)]).sort());
       if (before === after) return;
-      // respostas que os clientes deram pelo link desde a última atualização
-      const antes = new Map(db.orcamentos.map(o => [o.id, o.resposta?.em || '']));
       cloud.apply(rows);
-      const novas = db.orcamentos.filter(o => antes.has(o.id) && o.resposta?.em && o.resposta.em !== antes.get(o.id));
-      if (novas.length === 1) {
-        const o = novas[0];
-        toast(`Cliente ${o.resposta.acao === 'aprovado' ? 'aprovou' : 'recusou'} o orçamento nº ${pad(o.numero)} pelo link`);
-      } else if (novas.length > 1) {
-        toast(`${novas.length} orçamentos foram respondidos pelos clientes`);
-      }
-      if (!location.hash.startsWith('#orcamento/')) render();
+      render();
     } catch (e) { setSync('error'); }
   },
 };
