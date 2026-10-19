@@ -19,7 +19,7 @@ const DB_KEY = "oficina_db_v1";
 //   (uma versão antiga estragaria ou apagaria dados novos), iguale-a ao
 //   VERSION_CODE; as versões mais antigas ficam impedidas de gravar até atualizar.
 const VERSION_MAJOR = 1;
-const VERSION_CODE = 9;
+const VERSION_CODE = 10;
 const VERSION_PATCH = 0;
 const VERSION_NAME = `${VERSION_MAJOR}.${VERSION_CODE}.${VERSION_PATCH}`;
 const COMPAT_MINIMA = 6;
@@ -641,6 +641,23 @@ function servicoTabela(list, { veiculo = true, dono = true, vazio = "Nenhum serv
   return `<div class="table-wrap"><table class="list"><thead>${head}</thead><tbody>${rows}</tbody></table></div>`;
 }
 
+// Painel: últimos serviços como linha do tempo, uma informação embaixo da outra
+function ultimosServicos(list) {
+  if (!list.length) return `<p class="empty">Nenhum serviço registrado</p>`;
+  return `<div class="timeline ultimos">${list
+    .map((s) => {
+      const v = getVeiculo(s.veiculoId),
+        c = getCliente(s.clienteId) || getCliente(v?.clienteId);
+      return `<div class="tl-item click" data-servico="${esc(s.id)}">
+        <div class="ul-cliente strong">${esc(c?.nome || "—")}</div>
+        <div class="ul-placa">${v ? plate(v.placa) : "—"}</div>
+        <div class="ul-modelo muted">${esc(v ? v.modelo || "—" : "Veículo removido")}</div>
+        <div class="ul-total"><b>${valorOuTraco(s.valor)}</b></div>
+      </div>`;
+    })
+    .join("")}</div>`;
+}
+
 // Campo de pesquisa: só "Pesquisar" como dica e a lupa à direita
 const campoBusca = (valor) => `<div class="toolbar"><div class="busca">
   <input id="fBusca" type="search" enterkeyhint="search" autocomplete="off" placeholder="Pesquisar" aria-label="Pesquisar" value="${esc(valor || "")}">
@@ -665,7 +682,7 @@ const views = {
       </div>
       <div class="card"><div class="page-head" style="margin-bottom:8px"><h2>Últimos serviços</h2>
         <a class="btn sm" href="#servicos">Ver todos</a></div>
-        ${servicoTabela(ordenarServicos(db.servicos).slice(0, 8))}</div>`;
+        ${ultimosServicos(ordenarServicos(db.servicos).slice(0, 8))}</div>`;
   },
 
   servicos(_, q) {

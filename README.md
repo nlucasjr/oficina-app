@@ -183,7 +183,7 @@ O endereço depois do `#` decide a tela (**roteamento por hash**). A função `r
 
 | Hash | Tela |
 |---|---|
-| `#painel` | Resumo (veículos, clientes, serviços e faturado no mês) e últimos serviços |
+| `#painel` | Resumo (veículos, clientes, serviços e faturado no mês) e últimos serviços (linha do tempo: cliente, placa, modelo e total) |
 | `#servicos` | Todos os serviços, com busca por placa, marca, modelo, cliente, descrição ou data |
 | `#veiculos` / `#veiculo/<id>` | Lista de veículos e a ficha do veículo com o **histórico de serviços** |
 | `#clientes` / `#cliente/<id>` | Lista de clientes e a ficha com veículos e serviços feitos para ele |
@@ -298,7 +298,7 @@ O app segue o **padrão de versionamento do Android**, com dois números:
 
 | | Exemplo | Para que serve |
 |---|---|---|
-| **versionName** (`VERSION_NAME`) | `1.9.0` | O número que as pessoas veem (tela Ajustes e aviso de atualização), no formato **MAIOR.CÓDIGO.CORREÇÃO**. O número do meio é **sempre igual ao versionCode**; o app monta o nome a partir dele, então os dois não descasam. |
+| **versionName** (`VERSION_NAME`) | `1.10.0` | O número que as pessoas veem (tela Ajustes e aviso de atualização), no formato **MAIOR.CÓDIGO.CORREÇÃO**. O número do meio é **sempre igual ao versionCode**; o app monta o nome a partir dele, então os dois não descasam. |
 | **versionCode** (`VERSION_CODE`) | `9` | Inteiro que sobe **1 a cada publicação**. É o número que o app compara para saber se há atualização e para a trava de compatibilidade. |
 
 Os dois ficam no início do `app.js` e no `version.json`, que também repete o versionCode no campo `versao` para que versões antigas do app (que só conhecem esse campo) recebam o aviso.
@@ -329,7 +329,7 @@ sequenceDiagram
 ### Como publicar uma versão nova
 
 1. No `app.js`:
-   - **nova publicação do app** (qualquer mudança no app): `VERSION_CODE` + 1 e `VERSION_PATCH` volta a 0 (ex.: 1.8.0 → **1.9.0**);
+   - **nova publicação do app** (qualquer mudança no app): `VERSION_CODE` + 1 e `VERSION_PATCH` volta a 0 (ex.: 1.9.0 → **1.10.0**);
    - **mudança que não exige atualizar o app** (README, prints, testes): só `VERSION_PATCH` + 1 (ex.: 1.8.0 → **1.8.1**); o versionCode não muda, então ninguém recebe aviso;
    - **mudança muito grande**: `VERSION_MAJOR` + 1 (ex.: 1.12.0 → **2.13.0**; o código continua subindo).
 2. No `version.json`, coloque os mesmos valores em `versionCode`, `versionName` e `versao` (este repete o versionCode).

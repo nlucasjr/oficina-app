@@ -96,6 +96,9 @@ table.list td.desc { max-width: 420px; }
 .tl-desc { margin-top: 4px; white-space: pre-line; overflow-wrap: anywhere; }
 .tl-dono { font-size: 13px; margin-top: 4px; }
 .tl-partes { font-size: 13px; margin-top: 4px; }
+.ultimos .tl-item > div + div { margin-top: 3px; }
+.ultimos .ul-cliente { font-weight: 600; }
+.ultimos .ul-total { font-size: 15px; }
 /* Novo cliente / Novo veículo dentro do formulário de serviço */
 .sub-form { margin-top: 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); }
 .sub-form summary { list-style: none; cursor: pointer; padding: 11px 14px; font-weight: 600; color: var(--info);
