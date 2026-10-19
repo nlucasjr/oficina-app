@@ -6,18 +6,22 @@
 const DB_KEY = "oficina_db_v1";
 
 // ---------- versão do app (padrão Android) ----------
-// VERSION_NAME: o número que as pessoas veem, no formato MAIOR.MENOR.CORREÇÃO
-//   (ex.: 1.7.1). Correção sobe em ajustes e correções; menor, em recursos novos;
-//   maior, em mudanças grandes.
-// VERSION_CODE: inteiro que sobe 1 a cada publicação. É ele que o app compara
-//   para saber se há atualização e para a trava de compatibilidade.
-// A cada publicação: atualize os dois aqui e em version.json (versionCode,
+// VERSION_CODE: inteiro que sobe 1 a cada publicação do app. É ele que o app
+//   compara para saber se há atualização e para a trava de compatibilidade.
+// VERSION_NAME: o número que as pessoas veem, MAIOR.CÓDIGO.CORREÇÃO. O número do
+//   meio é sempre o VERSION_CODE (montado aqui, não dá para descasar):
+//   - nova publicação do app: VERSION_CODE + 1 e VERSION_PATCH volta a 0;
+//   - mudança que não exige atualizar o app (README, testes): só VERSION_PATCH + 1;
+//   - mudança muito grande: VERSION_MAJOR + 1.
+// A cada mudança: atualize version.json com os mesmos valores (versionCode,
 //   versionName e "versao", que repete o versionCode para versões antigas do app).
 // COMPAT_MINIMA (um versionCode): se a mudança altera o formato dos dados
 //   (uma versão antiga estragaria ou apagaria dados novos), iguale-a ao
 //   VERSION_CODE; as versões mais antigas ficam impedidas de gravar até atualizar.
-const VERSION_NAME = "1.7.1";
+const VERSION_MAJOR = 1;
 const VERSION_CODE = 8;
+const VERSION_PATCH = 0;
+const VERSION_NAME = `${VERSION_MAJOR}.${VERSION_CODE}.${VERSION_PATCH}`;
 const COMPAT_MINIMA = 6;
 
 // ---------- utilidades ----------
