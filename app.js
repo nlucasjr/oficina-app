@@ -10,7 +10,7 @@ const DB_KEY = "oficina_db_v1";
 // Se a mudança altera o formato dos dados (uma versão antiga estragaria ou
 // apagaria dados novos), iguale também COMPAT_MINIMA a APP_VERSAO: as versões
 // mais antigas que ela ficam impedidas de gravar até serem atualizadas.
-const APP_VERSAO = 4;
+const APP_VERSAO = 5;
 const COMPAT_MINIMA = 4;
 
 // ---------- utilidades ----------
@@ -569,6 +569,13 @@ const views = {
         }</p>
         <div class="actions"><button class="btn" data-act="exportar">⬇ Baixar backup</button>
         <label class="btn" style="margin:0;color:var(--text)">⬆ Restaurar backup<input type="file" id="importInput" accept="application/json" hidden></label></div>
+      </div>
+      <div class="card"><h2>Sobre o app</h2>
+        <div class="info-list">
+          <div><span>Versão</span><b id="appVersao">${APP_VERSAO}</b></div>
+          <div><span>Dados</span>${window.cloud?.on ? "Salvos na nuvem" : "Só neste aparelho (modo local)"}</div>
+        </div>
+        <div class="actions" style="margin-top:14px"><button class="btn" data-act="procurarAtualizacao">↻ Procurar atualização</button></div>
       </div>`;
   },
 };
@@ -586,6 +593,13 @@ const actions = {
   novoServico: (b) => editServico(null, b.dataset.veiculo ? { veiculoId: b.dataset.veiculo } : {}),
   del: (b) => removeItem(b.dataset.kind, b.dataset.id),
   atualizarApp: () => location.reload(),
+  procurarAtualizacao: async (b) => {
+    b.disabled = true;
+    const nova = await verificarAtualizacao();
+    b.disabled = false;
+    if (nova === false) toast(`Você já está na versão mais recente (${APP_VERSAO}).`);
+    else if (nova === null) toast("Não foi possível verificar agora. Confira a internet.");
+  },
   exportar: () => {
     const blob = new Blob([JSON.stringify(db, null, 2)], { type: "application/json" });
     const a = document.createElement("a");
@@ -657,14 +671,19 @@ function render() {
 }
 // ---------- atualização do app ----------
 // Confere se o site já tem uma versão mais nova que esta e avisa.
+// Devolve true se há versão nova, false se não há, null se não deu para conferir.
 async function verificarAtualizacao() {
   try {
     const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" });
-    if (!r.ok) return;
+    if (!r.ok) return null;
     const v = await r.json();
-    if (num(v.versao) > APP_VERSAO) avisoAtualizacao();
+    if (num(v.versao) > APP_VERSAO) {
+      avisoAtualizacao();
+      return true;
+    }
+    return false;
   } catch (e) {
-    /* sem internet: tenta de novo depois */
+    return null; // sem internet: tenta de novo depois
   }
 }
 function avisoAtualizacao() {
