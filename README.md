@@ -64,7 +64,7 @@ Regras principais:
 - **Km menor que o anterior:** se um serviço tiver km menor do que o de um serviço anterior do mesmo carro, o app pergunta antes de salvar (costuma ser erro de digitação).
 - **Dono na época:** cada serviço guarda quem era o dono quando foi registrado. Se o carro for vendido (troca de dono no cadastro do veículo), o histórico continua mostrando o dono antigo nos serviços antigos ("Dono na época: …"), e a ficha do cliente antigo continua listando os serviços feitos para ele.
 - **Valores do serviço:** cada serviço tem **mão de obra** e **peças**; o **total** é a soma dos dois, calculada na hora no formulário. Os campos aceitam `235,50`, `1.234,56`, `R$ 80` ou `80.5`; um valor inválido é recusado com aviso. Painel, lista de serviços e ficha do veículo mostram os totais de mão de obra, peças e geral.
-- **Serviços registrados antes da divisão** (versão 5 ou anterior) só têm o total. Eles continuam somando no total geral; ao editar, o formulário mostra o total guardado e, se mão de obra e peças forem deixadas vazias, o total é mantido.
+- **Serviços registrados antes da divisão** (versionCode 5 ou anterior) só têm o total. Eles continuam somando no total geral; ao editar, o formulário mostra o total guardado e, se mão de obra e peças forem deixadas vazias, o total é mantido.
 - **Novo cliente e novo veículo no próprio serviço:** o formulário de registrar serviço tem duas seções que abrem e fecham, nesta ordem: **Novo cliente** e **Novo veículo**. Abrir "Novo veículo" dispensa escolher um veículo da lista; abrir "Novo cliente" abre também o veículo, já com o novo cliente como dono. Ao **Salvar**, o app valida tudo e só então cria o cliente, o veículo e o serviço, nessa ordem (nada fica criado pela metade). Sem clientes ou veículos cadastrados, as seções necessárias já abrem sozinhas.
 - **Botão voltar do celular:** com uma janela de edição aberta, o primeiro "voltar" fecha só a janela (ou volta para a janela anterior, nos cadastros em sequência), sem sair da tela.
 - **Pesquisa:** os campos de busca mostram só "Pesquisar", em cinza, com a lupa à direita.
@@ -98,7 +98,7 @@ oficina-app/
 ├── cloud.js          Login e sincronização com o Supabase. Inicia o app (boot).
 ├── style.css         Visual do app; inclui o layout de celular (barra inferior, listas em cartões).
 ├── sw.js             Service worker (cache dos arquivos para o PWA).
-├── version.json      Número da versão publicada (para o aviso "Nova versão disponível").
+├── version.json      versionCode e versionName publicados (para o aviso "Nova versão disponível").
 ├── manifest.json     Nome, cores e ícones do app instalável.
 ├── icons/            Ícones do app (192, 512, maskable e apple-touch).
 ├── logo.png          Logo da barra lateral (fundo escuro).
@@ -294,11 +294,22 @@ erDiagram
 
 ## Versões e atualizações
 
+O app segue o **padrão de versionamento do Android**, com dois números:
+
+| | Exemplo | Para que serve |
+|---|---|---|
+| **versionName** (`VERSION_NAME`) | `1.7.1` | O número que as pessoas veem (tela Ajustes e aviso de atualização), no formato **MAIOR.MENOR.CORREÇÃO**: *correção* sobe em ajustes e correções, *menor* em recursos novos, *maior* em mudanças grandes. |
+| **versionCode** (`VERSION_CODE`) | `8` | Inteiro que sobe **1 a cada publicação**. É o número que o app compara para saber se há atualização e para a trava de compatibilidade. |
+
+Os dois ficam no início do `app.js` e no `version.json`, que também repete o versionCode no campo `versao` para que versões antigas do app (que só conhecem esse campo) recebam o aviso.
+
+Histórico: até o versionCode 7 o app usava só um número inteiro; o versionCode 8 é a versão **1.7.1**.
+
 Como a publicação no GitHub Pages pode atrasar, e aparelhos podem ficar com o app antigo aberto, o app se protege contra versões desatualizadas de duas formas.
 
-**1. Aviso de versão nova.** O app sabe a própria versão (`APP_VERSAO` no `app.js`) e, ao voltar para a tela e a cada 5 minutos, lê o `version.json` do site. Se o site tiver um número maior, aparece "Nova versão do app disponível · Atualizar".
+**1. Aviso de versão nova.** O app sabe o próprio versionCode e, ao voltar para a tela e a cada 5 minutos, lê o `version.json` do site. Se o site tiver um versionCode maior, aparece "Nova versão do app disponível (versionName) · Atualizar". Em **Ajustes → Sobre o app** aparecem a versão e o código, e o botão "Procurar atualização" faz a mesma conferência na hora.
 
-**2. Trava de compatibilidade.** O banco guarda a versão mínima que pode gravar (linha `sistema|versao`). Antes de cada gravação, e na atualização automática, o app confere esse número. Se ele for mais antigo que o exigido, **não grava nada** e mostra a tela "Atualize o app".
+**2. Trava de compatibilidade.** O banco guarda o versionCode mínimo que pode gravar (linha `sistema|versao`). Antes de cada gravação, e na atualização automática, o app confere esse número. Se ele for mais antigo que o exigido, **não grava nada** e mostra a tela "Atualize o app".
 
 ```mermaid
 sequenceDiagram
@@ -317,10 +328,11 @@ sequenceDiagram
 
 ### Como publicar uma versão nova
 
-1. Aumente `APP_VERSAO` no `app.js` e o mesmo número no `version.json`.
-2. Se a mudança altera o formato dos dados (campos que somem ou mudam de significado, tipos novos que versões antigas estragariam), iguale também `COMPAT_MINIMA` a `APP_VERSAO`.
-3. Se mudou a lista de arquivos do `sw.js`, aumente o `CACHE`.
-4. Envie para a `main`. Quando o GitHub Pages publicar, quem estiver com o app aberto recebe o aviso; se `COMPAT_MINIMA` subiu, versões antigas ficam impedidas de gravar até atualizar.
+1. No `app.js`, aumente `VERSION_CODE` em 1 e ajuste `VERSION_NAME` (ex.: `1.7.1` → `1.7.2` para uma correção, `1.8.0` para um recurso novo).
+2. No `version.json`, coloque os mesmos valores em `versionCode`, `versionName` e `versao` (este repete o versionCode).
+3. Se a mudança altera o formato dos dados (campos que somem ou mudam de significado, tipos novos que versões antigas estragariam), iguale também `COMPAT_MINIMA` ao novo `VERSION_CODE`.
+4. Se mudou a lista de arquivos do `sw.js`, aumente o `CACHE`.
+5. Envie para a `main`. Quando o GitHub Pages publicar, quem estiver com o app aberto recebe o aviso; se `COMPAT_MINIMA` subiu, versões antigas ficam impedidas de gravar até atualizar.
 
 ---
 
@@ -364,4 +376,4 @@ Todo push na `main` publica automaticamente no GitHub Pages (Settings → Pages)
 - **Conflitos:** a sincronização é por registro e vale o último que salvou. Duas pessoas editando o mesmo serviço ao mesmo tempo podem sobrescrever uma à outra.
 - **Offline:** o app abre sem internet, mas o login e o carregamento dos dados precisam de conexão. Edições feitas sem rede ficam pendentes e se perdem se o app for fechado antes de sincronizar.
 - **Sem perfis de acesso:** qualquer usuário logado pode alterar e excluir tudo.
-- **Versões anteriores à 4** não têm a trava de compatibilidade. Uma aba ou app instalado ainda com elas (a versão com orçamentos) pode apagar serviços do banco ao salvar algo. Feche e abra o app em todos os aparelhos depois da publicação. A partir da versão 4, isso é bloqueado automaticamente.
+- **Versões anteriores ao versionCode 4** não têm a trava de compatibilidade. Uma aba ou app instalado ainda com elas (a versão com orçamentos) pode apagar serviços do banco ao salvar algo. Feche e abra o app em todos os aparelhos depois da publicação. A partir do versionCode 4, isso é bloqueado automaticamente.

@@ -5,12 +5,19 @@
 
 const DB_KEY = "oficina_db_v1";
 
-// ---------- versão do app ----------
-// A cada versão publicada: aumente APP_VERSAO aqui e em version.json (mesmo número).
-// Se a mudança altera o formato dos dados (uma versão antiga estragaria ou
-// apagaria dados novos), iguale também COMPAT_MINIMA a APP_VERSAO: as versões
-// mais antigas que ela ficam impedidas de gravar até serem atualizadas.
-const APP_VERSAO = 7;
+// ---------- versão do app (padrão Android) ----------
+// VERSION_NAME: o número que as pessoas veem, no formato MAIOR.MENOR.CORREÇÃO
+//   (ex.: 1.7.1). Correção sobe em ajustes e correções; menor, em recursos novos;
+//   maior, em mudanças grandes.
+// VERSION_CODE: inteiro que sobe 1 a cada publicação. É ele que o app compara
+//   para saber se há atualização e para a trava de compatibilidade.
+// A cada publicação: atualize os dois aqui e em version.json (versionCode,
+//   versionName e "versao", que repete o versionCode para versões antigas do app).
+// COMPAT_MINIMA (um versionCode): se a mudança altera o formato dos dados
+//   (uma versão antiga estragaria ou apagaria dados novos), iguale-a ao
+//   VERSION_CODE; as versões mais antigas ficam impedidas de gravar até atualizar.
+const VERSION_NAME = "1.7.1";
+const VERSION_CODE = 8;
 const COMPAT_MINIMA = 6;
 
 // ---------- utilidades ----------
@@ -181,6 +188,7 @@ function fieldHTML(f, val) {
 let modalGen = 0, // muda a cada janela aberta
   modalHist = false, // existe um passo no histórico para a janela aberta
   ignorarPop = false, // o próximo "voltar" foi feito pelo próprio app
+  passoPendente = false, // janela aberta enquanto esse "voltar" ainda não terminou
   modalVoltar = null; // janela aberta a partir de outra: Cancelar/voltar retorna para ela
 
 function formModal(title, fields, data, onSave, opts = {}) {
@@ -188,8 +196,11 @@ function formModal(title, fields, data, onSave, opts = {}) {
   const gen = ++modalGen;
   modalVoltar = opts.onCancel || null;
   if (!modalHist) {
-    history.pushState({ modal: true }, "", location.href);
-    modalHist = true;
+    if (ignorarPop) passoPendente = true; // cria o passo quando o "voltar" anterior terminar
+    else {
+      history.pushState({ modal: true }, "", location.href);
+      modalHist = true;
+    }
   }
   m.innerHTML = `<div class="modal-card"><h3>${esc(title)}</h3>
     <form id="mf"><div class="grid">${fields.map((f) => fieldHTML(f, data[f.k])).join("")}</div>
@@ -246,6 +257,13 @@ function cancelarJanela() {
 window.addEventListener("popstate", () => {
   if (ignorarPop) {
     ignorarPop = false;
+    if (passoPendente) {
+      passoPendente = false;
+      if ($("#modal").classList.contains("open")) {
+        history.pushState({ modal: true }, "", location.href);
+        modalHist = true;
+      }
+    }
     return;
   }
   if (modalHist) {
@@ -799,7 +817,7 @@ const views = {
       </div>
       <div class="card"><h2>Sobre o app</h2>
         <div class="info-list">
-          <div><span>Versão</span><b id="appVersao">${APP_VERSAO}</b></div>
+          <div><span>Versão</span><b id="appVersao">${VERSION_NAME}</b> <span class="muted versao-codigo">(código ${VERSION_CODE})</span></div>
           <div><span>Dados</span>${window.cloud?.on ? "Salvos na nuvem" : "Só neste aparelho (modo local)"}</div>
         </div>
         <div class="actions" style="margin-top:14px"><button class="btn" data-act="procurarAtualizacao">↻ Procurar atualização</button></div>
@@ -824,7 +842,7 @@ const actions = {
     b.disabled = true;
     const nova = await verificarAtualizacao();
     b.disabled = false;
-    if (nova === false) toast(`Você já está na versão mais recente (${APP_VERSAO}).`);
+    if (nova === false) toast(`Você já está na versão mais recente (${VERSION_NAME}).`);
     else if (nova === null) toast("Não foi possível verificar agora. Confira a internet.");
   },
   exportar: () => {
@@ -904,8 +922,9 @@ async function verificarAtualizacao() {
     const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" });
     if (!r.ok) return null;
     const v = await r.json();
-    if (num(v.versao) > APP_VERSAO) {
-      avisoAtualizacao();
+    const codigo = num(v.versionCode ?? v.versao);
+    if (codigo > VERSION_CODE) {
+      avisoAtualizacao(v.versionName);
       return true;
     }
     return false;
@@ -913,13 +932,13 @@ async function verificarAtualizacao() {
     return null; // sem internet: tenta de novo depois
   }
 }
-function avisoAtualizacao() {
+function avisoAtualizacao(nome) {
   if ($("#upd")) return;
   const el = document.createElement("div");
   el.id = "upd";
   el.className = "upd";
   el.setAttribute("role", "status");
-  el.innerHTML = `<span>Nova versão do app disponível.</span>
+  el.innerHTML = `<span>Nova versão do app disponível${nome ? ` (${esc(nome)})` : ""}.</span>
     <button class="btn sm primary" data-act="atualizarApp">Atualizar</button>`;
   document.body.appendChild(el);
 }

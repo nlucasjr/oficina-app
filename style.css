@@ -156,6 +156,7 @@ table.list td.desc { max-width: 420px; }
 .bloqueio-card h2 { margin: 14px 0 8px; }
 .bloqueio-card p { line-height: 1.5; }
 .bloqueio-dica { font-size: 13px; margin-bottom: 0; }
+.info-list div span.versao-codigo { display: inline; font-size: 12px; }
 
 /* ================= Celular ================= */
 @media (max-width: 800px) {

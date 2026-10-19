@@ -10,7 +10,7 @@ const TIPOS = ['clientes', 'veiculos', 'servicos'];
 const conhecido = (tipo) => tipo === 'config' || TIPOS.includes(tipo);
 
 /* Trava de compatibilidade: a linha tipo 'sistema', id 'versao' guarda
-   { minima: N }. Um app com APP_VERSAO menor que N não grava nada e pede
+   { minima: N } (N é um versionCode). Um app com VERSION_CODE menor que N não grava nada e pede
    atualização. Só a versão publicada no site oficial (CFG.siteUrl) sobe esse
    número, então testar uma versão nova no computador nunca trava quem usa o site. */
 const SISTEMA = { tipo: 'sistema', id: 'versao' };
@@ -36,7 +36,7 @@ const cloud = {
 
   // Compara a versão exigida pelo banco com esta. Devolve false se bloqueou.
   checarCompat() {
-    if (cloud.minima > APP_VERSAO) {
+    if (cloud.minima > VERSION_CODE) {
       cloud.bloqueado = true; clearTimeout(cloud.timer);
       setSync('old'); bloquearDesatualizado();
       return false;
@@ -44,7 +44,7 @@ const cloud = {
     if (cloud.minima < COMPAT_MINIMA && publicado() && !cloud.subindo) {
       cloud.subindo = true;
       cloud.sb.from('registros')
-        .upsert({ ...SISTEMA, data: { minima: COMPAT_MINIMA, app: APP_VERSAO }, updated_at: new Date().toISOString() })
+        .upsert({ ...SISTEMA, data: { minima: COMPAT_MINIMA, app: VERSION_CODE, versao: VERSION_NAME }, updated_at: new Date().toISOString() })
         .then(({ error }) => { if (!error) cloud.minima = COMPAT_MINIMA; })
         .finally(() => { cloud.subindo = false; });
     }
