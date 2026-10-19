@@ -19,7 +19,7 @@ const DB_KEY = "oficina_db_v1";
 //   (uma versão antiga estragaria ou apagaria dados novos), iguale-a ao
 //   VERSION_CODE; as versões mais antigas ficam impedidas de gravar até atualizar.
 const VERSION_MAJOR = 1;
-const VERSION_CODE = 11;
+const VERSION_CODE = 12;
 const VERSION_PATCH = 0;
 const VERSION_NAME = `${VERSION_MAJOR}.${VERSION_CODE}.${VERSION_PATCH}`;
 const COMPAT_MINIMA = 6;
@@ -679,31 +679,73 @@ function removeItem(kind, id) {
 }
 
 // ---------- telas ----------
-// Lista de serviços (no celular cada linha vira um cartão)
-function servicoTabela(list, { veiculo = true, dono = true, vazio = "Nenhum serviço registrado" } = {}) {
-  const head = `<tr><th>Data</th>${veiculo ? "<th>Veículo</th>" : ""}<th>Serviço</th><th>Km</th>${
-    dono ? "<th>Dono na época</th>" : ""
-  }<th class="num">Mão de obra</th><th class="num">Peças</th><th class="num">Total</th></tr>`;
-  const cols = 6 + (veiculo ? 1 : 0) + (dono ? 1 : 0);
-  const rows = list.length
-    ? ordenarServicos(list)
-        .map((s) => {
-          const v = getVeiculo(s.veiculoId),
-            c = getCliente(s.clienteId);
-          return `<tr class="click" data-servico="${esc(s.id)}">
-        <td class="c2 sub">${fmtDate(s.data)}</td>
-        ${veiculo ? `<td class="c1 strong">${plate(v?.placa)} ${esc(v ? nomeVeiculo(v) : "Veículo removido")}</td>` : ""}
-        <td class="c1 desc"><span class="clamp">${esc(s.descricao)}</span></td>
-        <td class="c1 sub nowrap" data-l="Km">${kmFmt(s.km)}</td>
-        ${dono ? `<td class="c1 sub" data-l="Dono">${esc(c?.nome || "—")}</td>` : ""}
-        <td class="num c1 sub nowrap ${temDivisao(s) ? "" : "hide-sm"}" data-l="Mão de obra">${valorOuTraco(s.maoDeObra)}</td>
-        <td class="num c1 sub nowrap ${temDivisao(s) ? "" : "hide-sm"}" data-l="Peças">${valorOuTraco(s.pecas)}</td>
-        <td class="num c2 o-1 nowrap"><b>${valorOuTraco(s.valor)}</b></td></tr>`;
-        })
-        .join("")
-    : `<tr><td colspan="${cols}" class="empty">${vazio}</td></tr>`;
-  return `<div class="table-wrap"><table class="list"><thead>${head}</thead><tbody>${rows}</tbody></table></div>`;
+// Lista de serviços: cartões agrupados por mês
+const MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+const MESES_CURTOS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+const ICO_KM = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 17a8 8 0 1 1 15 0"/><path d="m12 13 3.5-4"/></svg>`;
+const ICO_DONO = `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></svg>`;
+
+function mesDoServico(s) {
+  const m = /^(\d{4})-(\d{2})/.exec(s.data || "");
+  return m ? { chave: m[1] + "-" + m[2], nome: `${MESES[+m[2] - 1]} de ${m[1]}` } : { chave: "", nome: "Sem data" };
 }
+
+function servicoCartao(s, { dono = true } = {}) {
+  const v = getVeiculo(s.veiculoId),
+    c = getCliente(s.clienteId);
+  const [, mes, dia] = String(s.data || "").slice(0, 10).split("-");
+  const meta = [
+    temNum(s.km) ? `<span class="sv-chip">${ICO_KM}${kmFmt(s.km)}</span>` : "",
+    dono && c ? `<span class="sv-chip">${ICO_DONO}${esc(c.nome)}</span>` : "",
+  ].join("");
+  return `<article class="sv click" data-servico="${esc(s.id)}">
+    <div class="sv-data" title="${fmtDate(s.data)}">${
+      dia ? `<b>${dia}</b><span>${MESES_CURTOS[+mes - 1] || ""}</span>` : "<span>—</span>"
+    }</div>
+    <div class="sv-corpo">
+      <div class="sv-veiculo">${v ? `${plate(v.placa)} <span>${esc(nomeVeiculo(v))}</span>` : `<span class="muted">Veículo removido</span>`}</div>
+      <div class="sv-desc clamp">${esc(s.descricao)}</div>
+      ${meta ? `<div class="sv-meta">${meta}</div>` : ""}
+    </div>
+    <div class="sv-valores">
+      <b class="sv-total">${valorOuTraco(s.valor)}</b>
+      ${
+        temDivisao(s)
+          ? `<div class="sv-partes">${temNum(s.maoDeObra) ? `<span>Mão de obra <b>${brl(s.maoDeObra)}</b></span>` : ""}${
+              temNum(s.pecas) ? `<span>Peças <b>${brl(s.pecas)}</b></span>` : ""
+            }</div>`
+          : ""
+      }
+    </div>
+  </article>`;
+}
+
+function servicoLista(list, { dono = true, vazio = "Nenhum serviço registrado" } = {}) {
+  if (!list.length) return `<div class="card"><p class="empty">${vazio}</p></div>`;
+  const grupos = [];
+  for (const s of ordenarServicos(list)) {
+    const m = mesDoServico(s);
+    if (!grupos.length || grupos.at(-1).chave !== m.chave) grupos.push({ ...m, itens: [] });
+    grupos.at(-1).itens.push(s);
+  }
+  return `<div class="sv-lista">${grupos
+    .map(
+      (g) => `<section class="sv-mes">
+      <header class="sv-mes-head"><h2>${g.nome}</h2><span>${g.itens.length} ${g.itens.length === 1 ? "serviço" : "serviços"} · <b>${brl(
+        totalValor(g.itens),
+      )}</b></span></header>
+      ${g.itens.map((s) => servicoCartao(s, { dono })).join("")}
+    </section>`,
+    )
+    .join("")}</div>`;
+}
+
+const resumoServicos = (list) => `<div class="sv-resumo">
+  <div><span>Serviços</span><b>${list.length}</b></div>
+  <div><span>Mão de obra</span><b>${brl(somaCampo(list, "maoDeObra"))}</b></div>
+  <div><span>Peças</span><b>${brl(somaCampo(list, "pecas"))}</b></div>
+  <div class="destaque"><span>Total</span><b>${brl(totalValor(list))}</b></div>
+</div>`;
 
 // Painel: últimos serviços como linha do tempo, uma informação embaixo da outra
 function ultimosServicos(list) {
@@ -759,10 +801,8 @@ const views = {
     });
     return `<div class="page-head"><h1>Serviços</h1>${btnServico()}</div>
       ${campoBusca(q.q)}
-      <p class="muted resumo">${list.length} ${list.length === 1 ? "serviço" : "serviços"} · Mão de obra ${brl(
-        somaCampo(list, "maoDeObra"),
-      )} · Peças ${brl(somaCampo(list, "pecas"))} · <b>Total ${brl(totalValor(list))}</b></p>
-      <div class="card">${servicoTabela(list, { vazio: busca ? "Nenhum serviço encontrado" : "Nenhum serviço registrado" })}</div>`;
+      ${resumoServicos(list)}
+      ${servicoLista(list, { vazio: busca ? "Nenhum serviço encontrado" : "Nenhum serviço registrado" })}`;
   },
 
   veiculos(_, q) {
@@ -887,8 +927,8 @@ const views = {
             : `<tr><td colspan="4" class="empty">Nenhum veículo</td></tr>`
         }
         </tbody></table></div></div>
-      <div class="card"><h2>Serviços feitos para este cliente</h2>
-        ${servicoTabela(servs, { dono: false })}</div>`;
+      <h2 class="sv-titulo">Serviços feitos para este cliente</h2>
+      ${servicoLista(servs, { dono: false })}`;
   },
 
   config() {
