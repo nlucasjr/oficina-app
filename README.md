@@ -66,6 +66,7 @@ Regras principais:
 - **Valores do serviço:** cada serviço tem **mão de obra** e **peças**; o **total** é a soma dos dois, calculada na hora no formulário. Os campos aceitam `235,50`, `1.234,56`, `R$ 80` ou `80.5`; um valor inválido é recusado com aviso. Painel, lista de serviços e ficha do veículo mostram os totais de mão de obra, peças e geral.
 - **Lista de serviços:** no topo, quadros com quantidade, mão de obra, peças e total (respeitando a busca). Os serviços aparecem em **cartões agrupados por mês** (com quantidade e total do mês); cada cartão mostra a data em destaque, placa e veículo, o que foi feito, km e dono na época, o total e, quando houver, mão de obra e peças. A ficha do cliente usa a mesma lista.
 - **Veículos e clientes:** listas em cartões (ícone do carro ou iniciais do cliente, com dono, km, quantidade de serviços, último serviço, telefone e placas). Tocar abre a ficha, que mostra os dados principais, o resumo de valores, o histórico nos mesmos cartões da lista de serviços (no veículo, "Dono na época" só aparece quando era outro dono) e o botão **Excluir** no fim da página.
+- **Tela do serviço:** tocar num serviço (em qualquer lista, no Painel ou no histórico) abre a tela com todos os detalhes — data por extenso, o que foi feito (texto completo), km no dia, dono na época e telefone, data de registro, mão de obra, peças e total, e o veículo. Dali se **edita** o serviço, registra outro serviço no mesmo veículo ou **exclui** (no fim da página). "← Voltar" retorna para a tela de onde se veio.
 - **Formulários:** título com **✕** para fechar, campos agrupados em seções (Serviço, Valores, Dados do veículo), "R$" e "km" dentro dos campos, placa sempre em maiúsculas e **Excluir** separado dos botões Cancelar/Salvar.
 - **Mensagens:** avisos de sucesso (verde) e de erro (vermelho) aparecem no **topo da tela**, sem cobrir o menu de baixo do celular. Somem sozinhos (erro fica mais tempo) ou ao **deslizar para o lado**.
 - **Serviços registrados antes da divisão** (versionCode 5 ou anterior) só têm o total. Eles continuam somando no total geral; ao editar, o formulário mostra o total guardado e, se mão de obra e peças forem deixadas vazias, o total é mantido.
@@ -187,6 +188,7 @@ O endereço depois do `#` decide a tela (**roteamento por hash**). A função `r
 
 | Hash | Tela |
 |---|---|
+| `#servico/<id>` | Detalhes de um serviço, com Editar e Excluir |
 | `#painel` | Resumo (veículos, clientes, serviços e faturado no mês) e últimos serviços (linha do tempo: cliente, placa, modelo e total) |
 | `#servicos` | Todos os serviços, com busca por placa, marca, modelo, cliente, descrição ou data |
 | `#veiculos` / `#veiculo/<id>` | Lista de veículos e a ficha do veículo com o **histórico de serviços** |
@@ -302,7 +304,7 @@ O app segue o **padrão de versionamento do Android**, com dois números:
 
 | | Exemplo | Para que serve |
 |---|---|---|
-| **versionName** (`VERSION_NAME`) | `1.13.0` | O número que as pessoas veem (tela Ajustes e aviso de atualização), no formato **MAIOR.CÓDIGO.CORREÇÃO**. O número do meio é **sempre igual ao versionCode**; o app monta o nome a partir dele, então os dois não descasam. |
+| **versionName** (`VERSION_NAME`) | `1.14.0` | O número que as pessoas veem (tela Ajustes e aviso de atualização), no formato **MAIOR.CÓDIGO.CORREÇÃO**. O número do meio é **sempre igual ao versionCode**; o app monta o nome a partir dele, então os dois não descasam. |
 | **versionCode** (`VERSION_CODE`) | `9` | Inteiro que sobe **1 a cada publicação**. É o número que o app compara para saber se há atualização e para a trava de compatibilidade. |
 
 Os dois ficam no início do `app.js` e no `version.json`, que também repete o versionCode no campo `versao` para que versões antigas do app (que só conhecem esse campo) recebam o aviso.
@@ -333,7 +335,7 @@ sequenceDiagram
 ### Como publicar uma versão nova
 
 1. No `app.js`:
-   - **nova publicação do app** (qualquer mudança no app): `VERSION_CODE` + 1 e `VERSION_PATCH` volta a 0 (ex.: 1.12.0 → **1.13.0**);
+   - **nova publicação do app** (qualquer mudança no app): `VERSION_CODE` + 1 e `VERSION_PATCH` volta a 0 (ex.: 1.13.0 → **1.14.0**);
    - **mudança que não exige atualizar o app** (README, prints, testes): só `VERSION_PATCH` + 1 (ex.: 1.8.0 → **1.8.1**); o versionCode não muda, então ninguém recebe aviso;
    - **mudança muito grande**: `VERSION_MAJOR` + 1 (ex.: 1.12.0 → **2.13.0**; o código continua subindo).
 2. No `version.json`, coloque os mesmos valores em `versionCode`, `versionName` e `versao` (este repete o versionCode).

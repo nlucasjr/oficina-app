@@ -224,6 +224,22 @@ input.maiusculas { text-transform: uppercase; font-family: ui-monospace, Menlo, 
 input.maiusculas::placeholder { text-transform: none; }
 .modal-card .zona-excluir { margin: 18px 0 0; padding-top: 12px; }
 
+/* ---------- tela de detalhes do serviço ---------- */
+.sv-data.grande { width: 56px; min-height: 56px; }
+.sv-data.grande b { font-size: 22px; }
+.sd-sobre { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; font-weight: 600; }
+.sd-bloco { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
+.sd-desc { white-space: pre-line; overflow-wrap: anywhere; font-size: 16px; line-height: 1.5; }
+.sd-valores h2 { margin-bottom: 6px; }
+.sd-linha { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 10px 0; border-bottom: 1px dashed var(--border); }
+.sd-linha span { color: var(--muted); }
+.sd-linha b { font-weight: 600; white-space: nowrap; }
+.sd-linha.sd-total { border-bottom: 0; padding-bottom: 0; }
+.sd-linha.sd-total span { color: var(--text); font-weight: 600; }
+.sd-linha.sd-total b { font-size: 22px; color: var(--text); }
+.sd-valores .hint { margin: 10px 0 0; }
+.sd-aviso { margin: -8px 4px 0; }
+
 @media (max-width: 800px) {
   .sv-resumo { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 14px; }
   .sv-resumo > div { padding: 8px 12px; }

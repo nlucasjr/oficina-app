@@ -19,7 +19,7 @@ const DB_KEY = "oficina_db_v1";
 //   (uma versão antiga estragaria ou apagaria dados novos), iguale-a ao
 //   VERSION_CODE; as versões mais antigas ficam impedidas de gravar até atualizar.
 const VERSION_MAJOR = 1;
-const VERSION_CODE = 13;
+const VERSION_CODE = 14;
 const VERSION_PATCH = 0;
 const VERSION_NAME = `${VERSION_MAJOR}.${VERSION_CODE}.${VERSION_PATCH}`;
 const COMPAT_MINIMA = 6;
@@ -662,7 +662,7 @@ function editServico(id, preset = {}) {
       );
       render();
     },
-    { extraHTML, onInput, ...(id ? { onDelete: () => removeItem("servico", id), textoExcluir: "Excluir serviço" } : {}) },
+    { extraHTML, onInput },
   );
   if (id) return; // editar serviço: sem as seções de novo cliente e novo veículo
   ligarNovosCadastros();
@@ -696,7 +696,8 @@ function removeItem(kind, id) {
     save();
     closeModal();
     toast("Serviço excluído");
-    render();
+    if (location.hash.startsWith("#servico/")) sair(v ? `#veiculo/${v.id}` : "#servicos");
+    else render();
   }
 }
 
@@ -891,6 +892,46 @@ const views = {
       ${servicoLista(list, { vazio: busca ? "Nenhum serviço encontrado" : "Nenhum serviço registrado" })}`;
   },
 
+  servico([id]) {
+    const s = getServico(id);
+    if (!s) return notFound();
+    const v = getVeiculo(s.veiculoId),
+      c = getCliente(s.clienteId),
+      donoAtual = v && getCliente(v.clienteId);
+    const [ano, mes, dia] = String(s.data || "").slice(0, 10).split("-");
+    const dataLonga = dia ? `${+dia} de ${MESES[+mes - 1].toLowerCase()} de ${ano}` : "Sem data";
+    const criado = String(s.criado || "").slice(0, 10);
+    const linhaValor = (rot, val, cls = "") => `<div class="sd-linha ${cls}"><span>${rot}</span><b>${valorOuTraco(val)}</b></div>`;
+    return `<a href="#servicos" class="voltar" data-act="voltar">← Voltar</a>
+      <div class="card ficha">
+        <div class="ficha-topo">
+          <div class="sv-data grande">${dia ? `<b>${dia}</b><span>${MESES_CURTOS[+mes - 1]}</span>` : "<span>—</span>"}</div>
+          <div class="ficha-nome"><span class="sd-sobre">Serviço</span><h1>${dataLonga}</h1></div>
+        </div>
+        <div class="sd-bloco"><span class="ficha-rot">${ICO_SERV}O que foi feito</span><div class="sd-desc">${esc(s.descricao) || "—"}</div></div>
+        <div class="ficha-dados">
+          <div><span class="ficha-rot">${ICO_KM}Km no dia</span>${kmFmt(s.km)}</div>
+          <div><span class="ficha-rot">${ICO_DONO}Dono na época</span>${c ? `<a href="#cliente/${c.id}">${esc(c.nome)}</a>` : "—"}</div>
+          <div><span class="ficha-rot">${ICO_TEL}Telefone</span>${telLink(c?.telefone)}</div>
+          ${criado ? `<div><span class="ficha-rot">${ICO_DATA}Registrado em</span>${fmtDate(criado)}</div>` : ""}
+        </div>
+        <div class="ficha-acoes"><button class="btn primary" data-act="editServico" data-id="${esc(id)}">Editar serviço</button>${
+          v ? btnServico(v.id, "+ Novo serviço neste veículo", "btn") : ""
+        }</div>
+      </div>
+      <div class="card sd-valores">
+        <h2>Valores</h2>
+        ${linhaValor("Mão de obra", s.maoDeObra)}
+        ${linhaValor("Peças", s.pecas)}
+        ${linhaValor("Total do serviço", s.valor, "sd-total")}
+        ${!temDivisao(s) && temNum(s.valor) ? `<p class="hint">Registrado sem a divisão entre mão de obra e peças.</p>` : ""}
+      </div>
+      <h2 class="sv-titulo">Veículo</h2>
+      ${v ? `<div class="itens">${veiculoItem(v)}</div>` : listaVazia("O veículo deste serviço foi removido.")}
+      ${v && donoAtual && c && donoAtual.id !== c.id ? `<p class="hint sd-aviso">Hoje o veículo é de ${esc(donoAtual.nome)}.</p>` : ""}
+      ${zonaExcluir("servico", id, "Excluir serviço")}`;
+  },
+
   veiculos(_, q) {
     const busca = norm(q.q);
     const list = db.veiculos
@@ -1000,8 +1041,19 @@ function notFound() {
   return `<div class="card empty">Registro não encontrado. <a href="#painel">Voltar ao painel</a></div>`;
 }
 
+// ---------- navegação ----------
+let rotaAtual = location.hash,
+  rotaAnterior = null; // tela de onde se veio dentro do app (null ao abrir direto pelo link)
+// "← Voltar": volta para a tela anterior do app; aberto direto pelo link, vai para a lista
+function sair(padrao) {
+  if (rotaAnterior && rotaAnterior !== location.hash) history.back();
+  else location.replace(padrao);
+}
+
 // ---------- ações ----------
 const actions = {
+  editServico: (b) => editServico(b.dataset.id),
+  voltar: (b) => sair(b.getAttribute("href") || "#painel"),
   novoCliente: () => editCliente(null),
   editCliente: (b) => editCliente(b.dataset.id),
   novoVeiculo: (b) => editVeiculo(null, { clienteId: b.dataset.cliente || "" }),
@@ -1035,7 +1087,7 @@ document.addEventListener("click", (e) => {
   }
   if (e.target.closest("a,button,input,select,textarea,label")) return;
   const sv = e.target.closest("[data-servico]");
-  if (sv) return editServico(sv.dataset.servico);
+  if (sv) return (location.hash = `#servico/${sv.dataset.servico}`);
   const tr = e.target.closest("[data-href]");
   if (tr) location.hash = tr.dataset.href;
 });
@@ -1087,7 +1139,7 @@ function render() {
   const [name, ...args] = path.split("/");
   const q = Object.fromEntries(new URLSearchParams(qs || ""));
   $("#main").innerHTML = (views[name] || views.painel)(args, q);
-  const section = { cliente: "clientes", veiculo: "veiculos" }[name] || (views[name] ? name : "painel");
+  const section = { cliente: "clientes", veiculo: "veiculos", servico: "servicos" }[name] || (views[name] ? name : "painel");
   $$("#nav a").forEach((a) => a.classList.toggle("active", a.dataset.r === section));
 }
 // ---------- atualização do app ----------
@@ -1142,6 +1194,8 @@ setInterval(verificarAtualizacao, 5 * 60 * 1000);
 setTimeout(verificarAtualizacao, 15000);
 
 window.addEventListener("hashchange", () => {
+  rotaAnterior = rotaAtual;
+  rotaAtual = location.hash;
   render();
   window.scrollTo(0, 0);
 });
