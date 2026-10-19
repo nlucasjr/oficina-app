@@ -19,7 +19,7 @@ const DB_KEY = "oficina_db_v1";
 //   (uma versão antiga estragaria ou apagaria dados novos), iguale-a ao
 //   VERSION_CODE; as versões mais antigas ficam impedidas de gravar até atualizar.
 const VERSION_MAJOR = 1;
-const VERSION_CODE = 10;
+const VERSION_CODE = 11;
 const VERSION_PATCH = 0;
 const VERSION_NAME = `${VERSION_MAJOR}.${VERSION_CODE}.${VERSION_PATCH}`;
 const COMPAT_MINIMA = 6;
@@ -93,7 +93,7 @@ function save() {
     localStorage.setItem(DB_KEY, JSON.stringify(db));
   } catch (e) {
     if (!window.cloud?.on)
-      alert("Não foi possível salvar (armazenamento cheio?). Faça um backup em Ajustes.");
+      erro("Não foi possível salvar (armazenamento cheio?). Faça um backup em Ajustes.");
   }
   window.cloud?.schedule();
 }
@@ -127,13 +127,77 @@ const temDivisao = (s) => temNum(s.maoDeObra) || temNum(s.pecas);
 const arred = (n) => Math.round(n * 100) / 100;
 const valorOuTraco = (v) => (temNum(v) ? brl(v) : "—");
 
-function toast(msg) {
+// Mensagem no topo da tela (sucesso ou erro); some sozinha ou deslizando para o lado
+function toast(msg, tipo = "ok") {
   const t = $("#toast");
+  if (!t) return;
   t.textContent = msg;
+  t.className = `toast ${tipo === "erro" ? "erro" : "ok"}`;
+  t.setAttribute("role", tipo === "erro" ? "alert" : "status");
+  t.style.transition = "none";
+  t.style.transform = t.style.opacity = "";
+  void t.offsetWidth; // reinicia a animação de entrada
+  t.style.transition = "";
   t.classList.add("show");
-  clearTimeout(toast._t);
-  toast._t = setTimeout(() => t.classList.remove("show"), 3500);
+  agendarFimToast(tipo === "erro" ? 6000 : 3500);
 }
+const erro = (msg) => toast(msg, "erro");
+
+function agendarFimToast(ms) {
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => fecharToast(), ms);
+}
+function fecharToast(dx = 0) {
+  const t = $("#toast");
+  clearTimeout(toast._t);
+  if (!t || !t.classList.contains("show")) return;
+  if (dx) {
+    // sai para o lado do gesto
+    t.style.transform = `translate(calc(-50% + ${dx > 0 ? 120 : -120}vw), 0)`;
+    t.style.opacity = "0";
+    setTimeout(() => {
+      t.style.transition = "none";
+      t.classList.remove("show");
+      t.style.transform = t.style.opacity = "";
+      void t.offsetWidth;
+      t.style.transition = "";
+    }, 220);
+  } else {
+    t.style.transform = t.style.opacity = "";
+    t.classList.remove("show");
+  }
+}
+// Deslizar a mensagem para o lado (dedo ou mouse) faz ela sumir
+(function ligarArrasteToast() {
+  const t = document.getElementById("toast");
+  if (!t) return;
+  let x0 = null, dx = 0;
+  t.addEventListener("pointerdown", (e) => {
+    if (!t.classList.contains("show")) return;
+    x0 = e.clientX; dx = 0;
+    clearTimeout(toast._t);
+    t.style.transition = "none";
+    try { t.setPointerCapture(e.pointerId); } catch {}
+  });
+  t.addEventListener("pointermove", (e) => {
+    if (x0 === null) return;
+    dx = e.clientX - x0;
+    t.style.transform = `translate(calc(-50% + ${dx}px), 0)`;
+    t.style.opacity = String(Math.max(0.2, 1 - Math.abs(dx) / 250));
+  });
+  const soltar = () => {
+    if (x0 === null) return;
+    x0 = null;
+    t.style.transition = "";
+    if (Math.abs(dx) > 60) fecharToast(dx);
+    else {
+      t.style.transform = t.style.opacity = "";
+      agendarFimToast(2500);
+    }
+  };
+  t.addEventListener("pointerup", soltar);
+  t.addEventListener("pointercancel", soltar);
+})();
 const plate = (p) => (p ? `<span class="plate">${esc(p)}</span>` : "");
 const telLink = (t) =>
   t ? `<a href="tel:${esc(String(t).replace(/[^\d+]/g, ""))}">${esc(t)}</a>` : "—";
@@ -228,7 +292,7 @@ function formModal(title, fields, data, onSave, opts = {}) {
       if (f.type === "money") {
         vals[f.k] = lerDinheiro(el.value);
         if (Number.isNaN(vals[f.k])) {
-          alert(`Valor inválido em "${f.label}". Use números, por exemplo 150 ou 235,50.`);
+          erro(`Valor inválido em "${f.label}". Use números, por exemplo 150 ou 235,50.`);
           el.focus();
           return;
         }
@@ -344,12 +408,12 @@ function editVeiculo(id, preset = {}, after, opts = {}) {
   formModal(id ? "Editar veículo" : "Novo veículo", veiculoFields(), v, (vals) => {
     vals.placa = vals.placa.toUpperCase().replace(/[^A-Z0-9]/g, "");
     if (!vals.placa) {
-      alert("Informe a placa.");
+      erro("Informe a placa.");
       return false;
     }
     const dup = db.veiculos.find((x) => x.placa === vals.placa && x.id !== id);
     if (dup) {
-      alert("Já existe um veículo com essa placa.");
+      erro("Já existe um veículo com essa placa.");
       return false;
     }
     if (id) Object.assign(v, vals);
@@ -468,11 +532,11 @@ function lerNovosCadastros(km) {
     veiculo = null;
   if (abrirC) {
     if (!val("nc_nome") || !val("nc_telefone")) {
-      alert("Novo cliente: informe nome e telefone.");
+      erro("Novo cliente: informe nome e telefone.");
       return null;
     }
     if (!abrirV) {
-      alert("Cadastre também o veículo do novo cliente.");
+      erro("Cadastre também o veículo do novo cliente.");
       $("#dNovoVeiculo").open = true;
       return null;
     }
@@ -482,16 +546,16 @@ function lerNovosCadastros(km) {
     const dono = val("nv_dono");
     const clienteId = dono === "__novo__" ? cliente?.id : getCliente(dono)?.id;
     if (!clienteId) {
-      alert("Novo veículo: escolha o dono.");
+      erro("Novo veículo: escolha o dono.");
       return null;
     }
     const placa = val("nv_placa").toUpperCase().replace(/[^A-Z0-9]/g, "");
     if (!placa || !val("nv_modelo")) {
-      alert("Novo veículo: informe placa e modelo.");
+      erro("Novo veículo: informe placa e modelo.");
       return null;
     }
     if (db.veiculos.some((x) => x.placa === placa)) {
-      alert("Já existe um veículo com essa placa. Escolha-o na lista de veículos.");
+      erro("Já existe um veículo com essa placa. Escolha-o na lista de veículos.");
       return null;
     }
     veiculo = { id: uid(), clienteId, placa, marca: val("nv_marca"), modelo: val("nv_modelo"), km: km === "" ? "" : km, criado: today() };
@@ -530,11 +594,11 @@ function editServico(id, preset = {}) {
       if (!novos) return false;
       const v = novos.veiculo || getVeiculo(vals.veiculoId);
       if (!v) {
-        alert("Escolha o veículo ou abra “Novo veículo” para cadastrar um.");
+        erro("Escolha o veículo ou abra “Novo veículo” para cadastrar um.");
         return false;
       }
       if (!vals.descricao) {
-        alert("Descreva o que foi feito.");
+        erro("Descreva o que foi feito.");
         return false;
       }
       vals.veiculoId = v.id;
@@ -588,16 +652,16 @@ function editServico(id, preset = {}) {
 function removeItem(kind, id) {
   if (kind === "cliente") {
     if (db.veiculos.some((v) => v.clienteId === id))
-      return alert("Este cliente é dono de veículos. Passe os veículos para outro dono ou exclua-os antes.");
+      return erro("Este cliente é dono de veículos. Passe os veículos para outro dono ou exclua-os antes.");
     if (db.servicos.some((s) => s.clienteId === id))
-      return alert("Este cliente aparece no histórico de serviços e não pode ser excluído.");
+      return erro("Este cliente aparece no histórico de serviços e não pode ser excluído.");
     if (!confirm("Excluir este cliente?")) return;
     db.clientes = db.clientes.filter((c) => c.id !== id);
     save();
     location.hash = "#clientes";
   } else if (kind === "veiculo") {
     if (db.servicos.some((s) => s.veiculoId === id))
-      return alert("Este veículo tem serviços no histórico. Exclua os serviços antes.");
+      return erro("Este veículo tem serviços no histórico. Exclua os serviços antes.");
     if (!confirm("Excluir este veículo?")) return;
     db.veiculos = db.veiculos.filter((v) => v.id !== id);
     save();
@@ -920,7 +984,7 @@ document.addEventListener("change", (e) => {
         toast("Backup restaurado");
         render();
       } catch (err) {
-        alert("Arquivo de backup inválido.");
+        erro("Arquivo de backup inválido.");
       }
     };
     r.readAsText(e.target.files[0]);
