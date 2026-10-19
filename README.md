@@ -65,7 +65,7 @@ Regras principais:
 - **Dono na época:** cada serviço guarda quem era o dono quando foi registrado. Se o carro for vendido (troca de dono no cadastro do veículo), o histórico continua mostrando o dono antigo nos serviços antigos ("Dono na época: …"), e a ficha do cliente antigo continua listando os serviços feitos para ele.
 - **Valores do serviço:** cada serviço tem **mão de obra** e **peças**; o **total** é a soma dos dois, calculada na hora no formulário. Os campos aceitam `235,50`, `1.234,56`, `R$ 80` ou `80.5`; um valor inválido é recusado com aviso. Painel, lista de serviços e ficha do veículo mostram os totais de mão de obra, peças e geral.
 - **Serviços registrados antes da divisão** (versionCode 5 ou anterior) só têm o total. Eles continuam somando no total geral; ao editar, o formulário mostra o total guardado e, se mão de obra e peças forem deixadas vazias, o total é mantido.
-- **Novo cliente e novo veículo no próprio serviço:** o formulário de registrar serviço tem duas seções que abrem e fecham, nesta ordem: **Novo cliente** e **Novo veículo**. Abrir "Novo veículo" dispensa escolher um veículo da lista; abrir "Novo cliente" abre também o veículo, já com o novo cliente como dono. Ao **Salvar**, o app valida tudo e só então cria o cliente, o veículo e o serviço, nessa ordem (nada fica criado pela metade). Sem clientes ou veículos cadastrados, as seções necessárias já abrem sozinhas.
+- **Novo cliente e novo veículo no próprio serviço:** o formulário de registrar serviço tem duas seções que abrem e fecham, nesta ordem: **Novo cliente** e **Novo veículo**. Abrir "Novo veículo" dispensa escolher um veículo da lista; abrir "Novo cliente" abre também o veículo, já com o novo cliente como dono. Ao **Salvar**, o app valida tudo e só então cria o cliente, o veículo e o serviço, nessa ordem (nada fica criado pela metade). Sem clientes ou veículos cadastrados, as seções necessárias já abrem sozinhas. Ao **editar** um serviço já registrado, essas seções não aparecem.
 - **Botão voltar do celular:** com uma janela de edição aberta, o primeiro "voltar" fecha só a janela (ou volta para a janela anterior, nos cadastros em sequência), sem sair da tela.
 - **Pesquisa:** os campos de busca mostram só "Pesquisar", em cinza, com a lupa à direita.
 - **Exclusões protegidas:** um veículo com serviços no histórico não pode ser excluído, e um cliente que é dono de veículos ou aparece no histórico também não.
@@ -298,8 +298,8 @@ O app segue o **padrão de versionamento do Android**, com dois números:
 
 | | Exemplo | Para que serve |
 |---|---|---|
-| **versionName** (`VERSION_NAME`) | `1.8.0` | O número que as pessoas veem (tela Ajustes e aviso de atualização), no formato **MAIOR.CÓDIGO.CORREÇÃO**. O número do meio é **sempre igual ao versionCode**; o app monta o nome a partir dele, então os dois não descasam. |
-| **versionCode** (`VERSION_CODE`) | `8` | Inteiro que sobe **1 a cada publicação**. É o número que o app compara para saber se há atualização e para a trava de compatibilidade. |
+| **versionName** (`VERSION_NAME`) | `1.9.0` | O número que as pessoas veem (tela Ajustes e aviso de atualização), no formato **MAIOR.CÓDIGO.CORREÇÃO**. O número do meio é **sempre igual ao versionCode**; o app monta o nome a partir dele, então os dois não descasam. |
+| **versionCode** (`VERSION_CODE`) | `9` | Inteiro que sobe **1 a cada publicação**. É o número que o app compara para saber se há atualização e para a trava de compatibilidade. |
 
 Os dois ficam no início do `app.js` e no `version.json`, que também repete o versionCode no campo `versao` para que versões antigas do app (que só conhecem esse campo) recebam o aviso.
 

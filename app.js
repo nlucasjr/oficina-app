@@ -19,7 +19,7 @@ const DB_KEY = "oficina_db_v1";
 //   (uma versão antiga estragaria ou apagaria dados novos), iguale-a ao
 //   VERSION_CODE; as versões mais antigas ficam impedidas de gravar até atualizar.
 const VERSION_MAJOR = 1;
-const VERSION_CODE = 8;
+const VERSION_CODE = 9;
 const VERSION_PATCH = 0;
 const VERSION_NAME = `${VERSION_MAJOR}.${VERSION_CODE}.${VERSION_PATCH}`;
 const COMPAT_MINIMA = 6;
@@ -365,7 +365,8 @@ function editVeiculo(id, preset = {}, after, opts = {}) {
 }
 
 // ---------- serviços ----------
-const servicoFields = () => [
+// novosCadastros: mostra as seções "Novo cliente" e "Novo veículo" (só ao registrar)
+const servicoFields = (novosCadastros = true) => [
   {
     k: "veiculoId",
     label: "Veículo",
@@ -382,7 +383,7 @@ const servicoFields = () => [
           l: [v.placa, nomeVeiculo(v), getCliente(v.clienteId)?.nome].filter(Boolean).join(" · "),
         })),
     ],
-    afterHTML: novosCadastrosHTML(),
+    afterHTML: novosCadastros ? novosCadastrosHTML() : "",
   },
   { k: "data", label: "Data do serviço", type: "date", required: true },
   { k: "km", label: "Km no dia", type: "number", step: "1", ph: "Ex.: 85400" },
@@ -461,8 +462,8 @@ function ligarNovosCadastros() {
 // Lê e valida as seções abertas. Devolve { cliente, veiculo } (novos) ou null se inválido.
 function lerNovosCadastros(km) {
   const val = (n) => ($(`#mf [name="${n}"]`)?.value || "").trim();
-  const abrirC = $("#dNovoCliente").open,
-    abrirV = $("#dNovoVeiculo").open;
+  const abrirC = !!$("#dNovoCliente")?.open, // ao editar, as seções não existem
+    abrirV = !!$("#dNovoVeiculo")?.open;
   let cliente = null,
     veiculo = null;
   if (abrirC) {
@@ -522,7 +523,7 @@ function editServico(id, preset = {}) {
   };
   formModal(
     id ? "Editar serviço" : "Registrar serviço",
-    servicoFields(),
+    servicoFields(!id),
     s,
     (vals) => {
       const novos = lerNovosCadastros(vals.km);
@@ -577,6 +578,7 @@ function editServico(id, preset = {}) {
     },
     { extraHTML, onInput, ...(id ? { onDelete: () => removeItem("servico", id) } : {}) },
   );
+  if (id) return; // editar serviço: sem as seções de novo cliente e novo veículo
   ligarNovosCadastros();
   // sem veículos (ou sem clientes) cadastrados: já abre as seções necessárias
   if (!db.clientes.length) $("#dNovoCliente").open = true;
