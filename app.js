@@ -19,7 +19,7 @@ const DB_KEY = "oficina_db_v1";
 //   (uma versão antiga estragaria ou apagaria dados novos), iguale-a ao
 //   VERSION_CODE; as versões mais antigas ficam impedidas de gravar até atualizar.
 const VERSION_MAJOR = 1;
-const VERSION_CODE = 12;
+const VERSION_CODE = 13;
 const VERSION_PATCH = 0;
 const VERSION_NAME = `${VERSION_MAJOR}.${VERSION_CODE}.${VERSION_PATCH}`;
 const COMPAT_MINIMA = 6;
@@ -218,8 +218,9 @@ const dinheiroNoCampo = (v) =>
 
 // ---------- formulários em janela ----------
 function fieldHTML(f, val) {
+  if (f.sec) return `<div class="full form-sec">${esc(f.sec)}</div>`;
   const v = f.type === "money" ? dinheiroNoCampo(val) : (val ?? f.default ?? "");
-  const cls = f.full ? "full" : "";
+  const cls = f.full ? "full" : f.metade ? "metade" : "";
   const req = f.required ? "required" : "";
   let input;
   if (f.type === "select") {
@@ -240,10 +241,20 @@ function fieldHTML(f, val) {
         ? `step="${f.step || "any"}" min="0" inputmode="${f.step === "1" ? "numeric" : "decimal"}"`
         : f.type === "tel"
           ? 'inputmode="tel" autocomplete="tel"'
-          : "";
+          : f.caps
+            ? 'autocapitalize="characters" autocomplete="off" spellcheck="false" class="maiusculas"'
+            : f.palavras
+              ? 'autocapitalize="words"'
+              : "";
     input = `<input name="${f.k}" type="${f.type || "text"}" value="${esc(v)}" ${extra} ${req} placeholder="${esc(f.ph || "")}">`;
   }
-  return `<div class="${cls}"><label>${esc(f.label)}${f.required ? " *" : ""}</label>${input}${
+  if (f.prefix || f.suffix)
+    input = `<div class="adorno">${f.prefix ? `<span class="adorno-pre">${esc(f.prefix)}</span>` : ""}${input}${
+      f.suffix ? `<span class="adorno-suf">${esc(f.suffix)}</span>` : ""
+    }</div>`;
+  const id = `f_${f.k}`;
+  input = input.replace(`name="${f.k}"`, `name="${f.k}" id="${id}"`);
+  return `<div class="${cls}"><label for="${id}">${esc(f.label)}${f.required ? ' <span class="obrig" title="obrigatório">*</span>' : ""}</label>${input}${
     f.hint ? `<div class="hint">${esc(f.hint)}</div>` : ""
   }${f.afterHTML || ""}</div>`;
 }
@@ -270,15 +281,19 @@ function formModal(title, fields, data, onSave, opts = {}) {
       modalHist = true;
     }
   }
-  m.innerHTML = `<div class="modal-card"><h3>${esc(title)}</h3>
-    <form id="mf"><div class="grid">${fields.map((f) => fieldHTML(f, data[f.k])).join("")}</div>
+  m.innerHTML = `<div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="mTitulo">
+    <div class="modal-head"><h3 id="mTitulo">${esc(title)}</h3>
+      <button type="button" class="modal-x" data-close-x aria-label="Fechar">✕</button></div>
+    <form id="mf"><div class="modal-corpo"><div class="grid">${fields.map((f) => fieldHTML(f, f.k ? data[f.k] : "")).join("")}</div>
     ${opts.extraHTML || ""}
+    ${opts.onDelete ? `<div class="zona-excluir"><button type="button" class="btn danger ghost" data-del>${esc(opts.textoExcluir || "Excluir")}</button></div>` : ""}
+    </div>
     <div class="modal-actions">
-      ${opts.onDelete ? `<button type="button" class="btn danger" data-del>Excluir</button><span class="grow"></span>` : ""}
       <button type="button" class="btn" data-close>Cancelar</button>
       <button class="btn primary">Salvar</button></div></form></div>`;
   m.classList.add("open");
   $("[data-close]", m).onclick = cancelarJanela;
+  $("[data-close-x]", m).onclick = cancelarJanela;
   if (opts.onDelete) $("[data-del]", m).onclick = opts.onDelete;
   if (opts.onInput) {
     $("#mf").addEventListener("input", opts.onInput);
@@ -287,7 +302,7 @@ function formModal(title, fields, data, onSave, opts = {}) {
   $("#mf").onsubmit = (e) => {
     e.preventDefault();
     const vals = {};
-    for (const f of fields) {
+    for (const f of fields.filter((x) => x.k)) {
       const el = $(`[name="${f.k}"]`, m);
       if (f.type === "money") {
         vals[f.k] = lerDinheiro(el.value);
@@ -301,7 +316,8 @@ function formModal(title, fields, data, onSave, opts = {}) {
     // se o salvar abriu outra janela (cadastro em sequência), ela continua aberta
     if (onSave(vals) !== false && gen === modalGen) closeModal();
   };
-  setTimeout(() => $("input,select,textarea", m)?.focus(), 30);
+  // no celular, focar abre o teclado e esconde o formulário: só foca no computador
+  if (!matchMedia("(max-width: 800px)").matches) setTimeout(() => $("#mf input, #mf select, #mf textarea")?.focus(), 30);
 }
 function fecharJanela() {
   $("#modal").classList.remove("open");
@@ -353,9 +369,9 @@ document.addEventListener("keydown", (e) => {
 
 // ---------- clientes ----------
 const clienteFields = () => [
-  { k: "nome", label: "Nome", required: true, full: true },
-  { k: "telefone", label: "Telefone", type: "tel", required: true, ph: "(67) 98888-7777" },
-  { k: "endereco", label: "Endereço", full: true },
+  { k: "nome", label: "Nome", required: true, full: true, palavras: true, ph: "Ex.: João Pereira" },
+  { k: "telefone", label: "Telefone", type: "tel", required: true, ph: "(67) 98888-7777", full: true },
+  { k: "endereco", label: "Endereço", palavras: true, ph: "Rua, número e bairro", full: true },
 ];
 function editCliente(id, after, opts = {}) {
   const c = id ? getCliente(id) : {};
@@ -381,21 +397,25 @@ const veiculoFields = () => [
     required: true,
     full: true,
     options: [
-      { v: "", l: "— selecione —" },
+      { v: "", l: "Escolha o dono do veículo" },
       ...db.clientes
         .slice()
         .sort((a, b) => a.nome.localeCompare(b.nome))
         .map((c) => ({ v: c.id, l: c.nome })),
     ],
   },
-  { k: "placa", label: "Placa", required: true, ph: "ABC1D23" },
-  { k: "marca", label: "Marca", ph: "Volkswagen" },
-  { k: "modelo", label: "Modelo", required: true, ph: "Gol 1.0" },
+  { sec: "Dados do veículo" },
+  { k: "placa", label: "Placa", required: true, ph: "ABC1D23", caps: true, metade: true },
+  { k: "marca", label: "Marca", ph: "Ex.: Volkswagen", palavras: true, metade: true },
+  { k: "modelo", label: "Modelo", required: true, ph: "Ex.: Gol 1.0", palavras: true, full: true },
   {
     k: "km",
     label: "Km atual",
     type: "number",
     step: "1",
+    suffix: "km",
+    ph: "0",
+    full: true,
     hint: "Atualiza sozinho a cada serviço registrado com km.",
   },
 ];
@@ -438,7 +458,7 @@ const servicoFields = (novosCadastros = true) => [
     required: true,
     full: true,
     options: [
-      { v: "", l: "— selecione —" },
+      { v: "", l: "Escolha o veículo" },
       ...db.veiculos
         .slice()
         .sort((a, b) => a.placa.localeCompare(b.placa))
@@ -449,8 +469,9 @@ const servicoFields = (novosCadastros = true) => [
     ],
     afterHTML: novosCadastros ? novosCadastrosHTML() : "",
   },
-  { k: "data", label: "Data do serviço", type: "date", required: true },
-  { k: "km", label: "Km no dia", type: "number", step: "1", ph: "Ex.: 85400" },
+  { sec: "Serviço" },
+  { k: "data", label: "Data do serviço", type: "date", required: true, metade: true },
+  { k: "km", label: "Km no dia", type: "number", step: "1", ph: "Ex.: 85400", suffix: "km", metade: true },
   {
     k: "descricao",
     label: "O que foi feito",
@@ -460,8 +481,9 @@ const servicoFields = (novosCadastros = true) => [
     full: true,
     ph: "Ex.: Troca de óleo 5W30 e filtro de óleo",
   },
-  { k: "maoDeObra", label: "Mão de obra (R$)", type: "money", ph: "0,00" },
-  { k: "pecas", label: "Peças (R$)", type: "money", ph: "0,00" },
+  { sec: "Valores" },
+  { k: "maoDeObra", label: "Mão de obra", type: "money", ph: "0,00", prefix: "R$", metade: true },
+  { k: "pecas", label: "Peças", type: "money", ph: "0,00", prefix: "R$", metade: true },
 ];
 
 /* "Novo cliente" e "Novo veículo" dentro do formulário de serviço: duas seções
@@ -472,22 +494,22 @@ function novosCadastrosHTML() {
   return `<details class="sub-form" id="dNovoCliente">
       <summary>Novo cliente</summary>
       <div class="grid">
-        <div class="full"><label>Nome *</label><input name="nc_nome" autocomplete="off"></div>
-        <div><label>Telefone *</label><input name="nc_telefone" type="tel" inputmode="tel" autocomplete="off" placeholder="(67) 98888-7777"></div>
-        <div><label>Endereço</label><input name="nc_endereco" autocomplete="off"></div>
+        <div class="full"><label>Nome <span class="obrig">*</span></label><input name="nc_nome" autocomplete="off" autocapitalize="words" placeholder="Ex.: João Pereira"></div>
+        <div><label>Telefone <span class="obrig">*</span></label><input name="nc_telefone" type="tel" inputmode="tel" autocomplete="off" placeholder="(67) 98888-7777"></div>
+        <div><label>Endereço</label><input name="nc_endereco" autocomplete="off" autocapitalize="words" placeholder="Rua, número e bairro"></div>
       </div>
     </details>
     <details class="sub-form" id="dNovoVeiculo">
       <summary>Novo veículo</summary>
       <div class="grid">
-        <div class="full"><label>Dono *</label><select name="nv_dono">
-          <option value="">— selecione —</option>
+        <div class="full"><label>Dono <span class="obrig">*</span></label><select name="nv_dono">
+          <option value="">Escolha o dono</option>
           <option value="__novo__" hidden disabled>Novo cliente (acima)</option>
           ${clientes.map((c) => `<option value="${esc(c.id)}">${esc(c.nome)}</option>`).join("")}
         </select></div>
-        <div><label>Placa *</label><input name="nv_placa" autocomplete="off" placeholder="ABC1D23"></div>
-        <div><label>Marca</label><input name="nv_marca" autocomplete="off" placeholder="Volkswagen"></div>
-        <div class="full"><label>Modelo *</label><input name="nv_modelo" autocomplete="off" placeholder="Gol 1.0"></div>
+        <div><label>Placa <span class="obrig">*</span></label><input name="nv_placa" class="maiusculas" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABC1D23"></div>
+        <div><label>Marca</label><input name="nv_marca" autocomplete="off" autocapitalize="words" placeholder="Ex.: Volkswagen"></div>
+        <div class="full"><label>Modelo <span class="obrig">*</span></label><input name="nv_modelo" autocomplete="off" autocapitalize="words" placeholder="Ex.: Gol 1.0"></div>
       </div>
       <p class="hint">O serviço será registrado neste veículo novo.</p>
     </details>`;
@@ -640,7 +662,7 @@ function editServico(id, preset = {}) {
       );
       render();
     },
-    { extraHTML, onInput, ...(id ? { onDelete: () => removeItem("servico", id) } : {}) },
+    { extraHTML, onInput, ...(id ? { onDelete: () => removeItem("servico", id), textoExcluir: "Excluir serviço" } : {}) },
   );
   if (id) return; // editar serviço: sem as seções de novo cliente e novo veículo
   ligarNovosCadastros();
@@ -684,26 +706,90 @@ const MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julh
 const MESES_CURTOS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 const ICO_KM = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 17a8 8 0 1 1 15 0"/><path d="m12 13 3.5-4"/></svg>`;
 const ICO_DONO = `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></svg>`;
+const ICO_TEL = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg>`;
+const ICO_LOCAL = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>`;
+const ICO_DATA = `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>`;
+const ICO_SERV = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L4 17l3 3 5.3-5.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.5-.5-.5-2.5z"/></svg>`;
+const ICO_CARRO = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 16V11l2-5h10l2 5v5"/><path d="M3 16h18v3H3zM5 11h14"/><circle cx="7.5" cy="13.5" r=".6"/><circle cx="16.5" cy="13.5" r=".6"/></svg>`;
+const ICO_SETA = `<svg class="item-seta" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>`;
+const chip = (ico, html) => (html ? `<span class="sv-chip">${ico}${html}</span>` : "");
+const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
+const iniciais = (nome) =>
+  String(nome || "?").trim().split(/\s+/).filter(Boolean).map((p) => p[0]).filter((_, i, a) => i === 0 || i === a.length - 1).join("").toUpperCase() || "?";
+// cor estável do avatar a partir do nome
+const corAvatar = (nome) => {
+  let h = 0;
+  for (const ch of String(nome || "")) h = (h * 31 + ch.charCodeAt(0)) % 360;
+  return `hsl(${h} 55% 42%)`;
+};
+const avatar = (nome, cls = "") => `<span class="avatar ${cls}" style="background:${corAvatar(nome)}" aria-hidden="true">${esc(iniciais(nome))}</span>`;
+
+// Cartão de veículo (lista de veículos e ficha do cliente)
+function veiculoItem(v, { dono = true, acao = "" } = {}) {
+  const c = getCliente(v.clienteId),
+    hist = servicosDoVeiculo(v.id),
+    ult = hist[0];
+  return `<div class="item" data-href="#veiculo/${esc(v.id)}" role="link" tabindex="0">
+    <span class="item-ico">${ICO_CARRO}</span>
+    <div class="item-corpo">
+      <div class="item-titulo">${plate(v.placa)} <span>${esc(nomeVeiculo(v)) || "—"}</span></div>
+      <div class="sv-meta">
+        ${dono ? chip(ICO_DONO, esc(c?.nome || "Sem dono")) : ""}
+        ${chip(ICO_KM, kmFmt(v.km))}
+        ${chip(ICO_SERV, plural(hist.length, "serviço", "serviços"))}
+        ${ult ? chip(ICO_DATA, "Último: " + fmtDate(ult.data)) : ""}
+      </div>
+    </div>
+    ${acao || ICO_SETA}
+  </div>`;
+}
+
+// Cartão de cliente (lista de clientes)
+function clienteItem(c) {
+  const veics = db.veiculos.filter((v) => v.clienteId === c.id),
+    nServ = db.servicos.filter((s) => s.clienteId === c.id).length;
+  return `<div class="item" data-href="#cliente/${esc(c.id)}" role="link" tabindex="0">
+    ${avatar(c.nome)}
+    <div class="item-corpo">
+      <div class="item-titulo"><span>${esc(c.nome)}</span></div>
+      <div class="sv-meta">
+        ${chip(ICO_TEL, esc(c.telefone))}
+        ${chip(ICO_CARRO, plural(veics.length, "veículo", "veículos"))}
+        ${chip(ICO_SERV, plural(nServ, "serviço", "serviços"))}
+      </div>
+      ${veics.length ? `<div class="item-placas">${veics.map((v) => plate(v.placa)).join("")}</div>` : ""}
+    </div>
+    ${ICO_SETA}
+  </div>`;
+}
+
+const listaInfo = (n, um, varios, busca) =>
+  `<p class="lista-info">${plural(n, um, varios)}${busca ? (n === 1 ? " encontrado" : " encontrados") : ""}</p>`;
+const listaVazia = (txt, botao = "") => `<div class="card vazio"><p>${txt}</p>${botao}</div>`;
+const zonaExcluir = (kind, id, txt) =>
+  `<div class="zona-excluir"><button class="btn danger ghost" data-act="del" data-kind="${kind}" data-id="${esc(id)}">${txt}</button></div>`;
 
 function mesDoServico(s) {
   const m = /^(\d{4})-(\d{2})/.exec(s.data || "");
   return m ? { chave: m[1] + "-" + m[2], nome: `${MESES[+m[2] - 1]} de ${m[1]}` } : { chave: "", nome: "Sem data" };
 }
 
-function servicoCartao(s, { dono = true } = {}) {
+function servicoCartao(s, { dono = true, veiculo = true, donoAtual = null } = {}) {
   const v = getVeiculo(s.veiculoId),
     c = getCliente(s.clienteId);
   const [, mes, dia] = String(s.data || "").slice(0, 10).split("-");
   const meta = [
     temNum(s.km) ? `<span class="sv-chip">${ICO_KM}${kmFmt(s.km)}</span>` : "",
-    dono && c ? `<span class="sv-chip">${ICO_DONO}${esc(c.nome)}</span>` : "",
+    dono && c && (!donoAtual || c.id !== donoAtual)
+      ? `<span class="sv-chip">${ICO_DONO}${donoAtual ? "Dono na época: " : ""}${esc(c.nome)}</span>`
+      : "",
   ].join("");
-  return `<article class="sv click" data-servico="${esc(s.id)}">
+  return `<article class="sv click${veiculo ? "" : " sem-veiculo"}" data-servico="${esc(s.id)}" tabindex="0">
     <div class="sv-data" title="${fmtDate(s.data)}">${
       dia ? `<b>${dia}</b><span>${MESES_CURTOS[+mes - 1] || ""}</span>` : "<span>—</span>"
     }</div>
     <div class="sv-corpo">
-      <div class="sv-veiculo">${v ? `${plate(v.placa)} <span>${esc(nomeVeiculo(v))}</span>` : `<span class="muted">Veículo removido</span>`}</div>
+      ${veiculo ? `<div class="sv-veiculo">${v ? `${plate(v.placa)} <span>${esc(nomeVeiculo(v))}</span>` : `<span class="muted">Veículo removido</span>`}</div>` : ""}
       <div class="sv-desc clamp">${esc(s.descricao)}</div>
       ${meta ? `<div class="sv-meta">${meta}</div>` : ""}
     </div>
@@ -720,8 +806,8 @@ function servicoCartao(s, { dono = true } = {}) {
   </article>`;
 }
 
-function servicoLista(list, { dono = true, vazio = "Nenhum serviço registrado" } = {}) {
-  if (!list.length) return `<div class="card"><p class="empty">${vazio}</p></div>`;
+function servicoLista(list, { vazio = "Nenhum serviço registrado", ...opcoes } = {}) {
+  if (!list.length) return listaVazia(vazio);
   const grupos = [];
   for (const s of ordenarServicos(list)) {
     const m = mesDoServico(s);
@@ -734,7 +820,7 @@ function servicoLista(list, { dono = true, vazio = "Nenhum serviço registrado" 
       <header class="sv-mes-head"><h2>${g.nome}</h2><span>${g.itens.length} ${g.itens.length === 1 ? "serviço" : "serviços"} · <b>${brl(
         totalValor(g.itens),
       )}</b></span></header>
-      ${g.itens.map((s) => servicoCartao(s, { dono })).join("")}
+      ${g.itens.map((s) => servicoCartao(s, opcoes)).join("")}
     </section>`,
     )
     .join("")}</div>`;
@@ -812,23 +898,13 @@ const views = {
       .sort((a, b) => a.placa.localeCompare(b.placa));
     return `<div class="page-head"><h1>Veículos</h1><button class="btn primary" data-act="novoVeiculo">+ Novo veículo</button></div>
       ${campoBusca(q.q)}
-      <div class="card"><div class="table-wrap"><table class="list">
-      <thead><tr><th>Placa</th><th>Veículo</th><th>Dono</th><th>Km atual</th><th>Último serviço</th></tr></thead><tbody>
       ${
         list.length
-          ? list
-              .map((v) => {
-                const ult = servicosDoVeiculo(v.id)[0];
-                return `<tr class="click" data-href="#veiculo/${v.id}"><td class="c2">${plate(v.placa)}</td>
-          <td class="c1 strong">${esc(nomeVeiculo(v)) || "—"}</td>
-          <td class="c1 sub">${esc(getCliente(v.clienteId)?.nome || "—")}</td>
-          <td class="c1 sub nowrap" data-l="Km">${kmFmt(v.km)}</td>
-          <td class="c1 sub" data-l="Último serviço">${ult ? fmtDate(ult.data) : "—"}</td></tr>`;
-              })
-              .join("")
-          : `<tr><td colspan="5" class="empty">${busca ? "Nenhum veículo encontrado" : "Nenhum veículo cadastrado"}</td></tr>`
-      }
-      </tbody></table></div></div>`;
+          ? `${listaInfo(list.length, "veículo", "veículos", busca)}<div class="itens">${list.map((v) => veiculoItem(v)).join("")}</div>`
+          : busca
+            ? listaVazia("Nenhum veículo encontrado")
+            : listaVazia("Nenhum veículo cadastrado ainda.", `<button class="btn primary" data-act="novoVeiculo">+ Cadastrar o primeiro veículo</button>`)
+      }`;
   },
 
   veiculo([id]) {
@@ -836,37 +912,23 @@ const views = {
     if (!v) return notFound();
     const c = getCliente(v.clienteId);
     const hist = servicosDoVeiculo(id);
-    return `<div class="page-head"><div><a href="#veiculos" class="muted">← Veículos</a>
-      <h1>${plate(v.placa)} ${esc(nomeVeiculo(v))}</h1></div>
-      <div class="actions">${btnServico(id)}
-        <button class="btn" data-act="editVeiculo" data-id="${id}">Editar</button>
-        <button class="btn danger" data-act="del" data-kind="veiculo" data-id="${id}">Excluir</button>
-      </div></div>
-      <div class="card"><div class="info-list">
-        <div><span>Dono atual</span>${c ? `<a href="#cliente/${c.id}">${esc(c.nome)}</a>` : "—"}</div>
-        <div><span>Telefone</span>${telLink(c?.telefone)}</div>
-        <div><span>Km atual</span>${kmFmt(v.km)}</div>
-        <div><span>Serviços</span>${hist.length} · ${brl(totalValor(hist))}</div>
-        <div><span>Mão de obra / Peças</span>${brl(somaCampo(hist, "maoDeObra"))} / ${brl(somaCampo(hist, "pecas"))}</div>
-      </div></div>
-      <div class="card"><h2>Histórico de serviços</h2>
-      ${
-        hist.length
-          ? `<div class="timeline">${hist
-              .map((s) => {
-                const dono = getCliente(s.clienteId);
-                return `<div class="tl-item click" data-servico="${esc(s.id)}">
-          <div class="tl-head"><b>${fmtDate(s.data)}</b><span class="muted">${kmFmt(s.km)}</span>
-            <b class="tl-valor">${temNum(s.valor) ? brl(s.valor) : ""}</b></div>
-          <div class="tl-desc">${esc(s.descricao)}</div>
-          ${temDivisao(s) ? `<div class="muted tl-partes">Mão de obra ${valorOuTraco(s.maoDeObra)} · Peças ${valorOuTraco(s.pecas)}</div>` : ""}
-          ${s.clienteId && s.clienteId !== v.clienteId ? `<div class="muted tl-dono">Dono na época: ${esc(dono?.nome || "—")}</div>` : ""}
-        </div>`;
-              })
-              .join("")}</div>`
-          : `<p class="empty">Nenhum serviço registrado ainda.</p>`
-      }
-      </div>`;
+    return `<a href="#veiculos" class="voltar">← Veículos</a>
+      <div class="card ficha">
+        <div class="ficha-topo">
+          <span class="item-ico grande">${ICO_CARRO}</span>
+          <div class="ficha-nome">${plate(v.placa)}<h1>${esc(nomeVeiculo(v)) || "Veículo"}</h1></div>
+        </div>
+        <div class="ficha-dados">
+          <div><span class="ficha-rot">${ICO_DONO}Dono atual</span>${c ? `<a href="#cliente/${c.id}">${esc(c.nome)}</a>` : "—"}</div>
+          <div><span class="ficha-rot">${ICO_TEL}Telefone</span>${telLink(c?.telefone)}</div>
+          <div><span class="ficha-rot">${ICO_KM}Km atual</span>${kmFmt(v.km)}</div>
+        </div>
+        <div class="ficha-acoes">${btnServico(id)}<button class="btn" data-act="editVeiculo" data-id="${id}">Editar veículo</button></div>
+      </div>
+      ${resumoServicos(hist)}
+      <h2 class="sv-titulo">Histórico de serviços</h2>
+      ${servicoLista(hist, { veiculo: false, donoAtual: v.clienteId, vazio: "Nenhum serviço registrado ainda." })}
+      ${zonaExcluir("veiculo", id, "Excluir veículo")}`;
   },
 
   clientes(_, q) {
@@ -876,26 +938,13 @@ const views = {
       .sort((a, b) => a.nome.localeCompare(b.nome));
     return `<div class="page-head"><h1>Clientes</h1><button class="btn primary" data-act="novoCliente">+ Novo cliente</button></div>
       ${campoBusca(q.q)}
-      <div class="card"><div class="table-wrap"><table class="list">
-      <thead><tr><th>Nome</th><th>Telefone</th><th>Veículos</th><th class="num">Serviços</th></tr></thead><tbody>
       ${
         list.length
-          ? list
-              .map(
-                (c) => `<tr class="click" data-href="#cliente/${c.id}">
-        <td class="c1 strong">${esc(c.nome)}</td><td class="c1 sub">${esc(c.telefone)}</td>
-        <td class="c1">${
-          db.veiculos
-            .filter((v) => v.clienteId === c.id)
-            .map((v) => plate(v.placa))
-            .join(" ") || '<span class="muted">—</span>'
-        }</td>
-        <td class="num c2 sub" data-l="Serviços">${db.servicos.filter((s) => s.clienteId === c.id).length}</td></tr>`,
-              )
-              .join("")
-          : `<tr><td colspan="4" class="empty">${busca ? "Nenhum cliente encontrado" : "Nenhum cliente cadastrado"}</td></tr>`
-      }
-      </tbody></table></div></div>`;
+          ? `${listaInfo(list.length, "cliente", "clientes", busca)}<div class="itens">${list.map(clienteItem).join("")}</div>`
+          : busca
+            ? listaVazia("Nenhum cliente encontrado")
+            : listaVazia("Nenhum cliente cadastrado ainda.", `<button class="btn primary" data-act="novoCliente">+ Cadastrar o primeiro cliente</button>`)
+      }`;
   },
 
   cliente([id]) {
@@ -903,32 +952,27 @@ const views = {
     if (!c) return notFound();
     const veics = db.veiculos.filter((v) => v.clienteId === id).sort((a, b) => a.placa.localeCompare(b.placa));
     const servs = db.servicos.filter((s) => s.clienteId === id);
-    return `<div class="page-head"><div><a href="#clientes" class="muted">← Clientes</a><h1>${esc(c.nome)}</h1></div>
-      <div class="actions">
-        <button class="btn" data-act="editCliente" data-id="${id}">Editar</button>
-        <button class="btn danger" data-act="del" data-kind="cliente" data-id="${id}">Excluir</button>
-      </div></div>
-      <div class="card"><div class="info-list">
-        <div><span>Telefone</span>${telLink(c.telefone)}</div>
-        <div><span>Endereço</span>${esc(c.endereco) || "—"}</div>
-      </div></div>
-      <div class="card"><div class="page-head" style="margin-bottom:8px"><h2>Veículos</h2>
-        <button class="btn sm" data-act="novoVeiculo" data-cliente="${id}">+ Adicionar veículo</button></div>
-        <div class="table-wrap"><table class="list"><thead><tr><th>Placa</th><th>Veículo</th><th>Km atual</th><th></th></tr></thead><tbody>
-        ${
-          veics.length
-            ? veics
-                .map(
-                  (v) => `<tr class="click" data-href="#veiculo/${v.id}"><td class="c2">${plate(v.placa)}</td>
-          <td class="c1 strong">${esc(nomeVeiculo(v)) || "—"}</td><td class="c1 sub nowrap" data-l="Km">${kmFmt(v.km)}</td>
-          <td class="num c2">${btnServico(v.id, "+ Serviço", "btn sm")}</td></tr>`,
-                )
-                .join("")
-            : `<tr><td colspan="4" class="empty">Nenhum veículo</td></tr>`
-        }
-        </tbody></table></div></div>
+    return `<a href="#clientes" class="voltar">← Clientes</a>
+      <div class="card ficha">
+        <div class="ficha-topo">${avatar(c.nome, "grande")}<div class="ficha-nome"><h1>${esc(c.nome)}</h1></div></div>
+        <div class="ficha-dados">
+          <div><span class="ficha-rot">${ICO_TEL}Telefone</span>${telLink(c.telefone)}</div>
+          <div><span class="ficha-rot">${ICO_LOCAL}Endereço</span>${esc(c.endereco) || "—"}</div>
+        </div>
+        <div class="ficha-acoes"><button class="btn" data-act="editCliente" data-id="${id}">Editar cliente</button></div>
+      </div>
+      ${resumoServicos(servs)}
+      <div class="secao-head"><h2>Veículos</h2><button class="btn sm" data-act="novoVeiculo" data-cliente="${id}">+ Adicionar veículo</button></div>
+      ${
+        veics.length
+          ? `<div class="itens">${veics
+              .map((v) => veiculoItem(v, { dono: false, acao: btnServico(v.id, "+ Serviço", "btn sm item-acao") }))
+              .join("")}</div>`
+          : listaVazia("Nenhum veículo deste cliente.")
+      }
       <h2 class="sv-titulo">Serviços feitos para este cliente</h2>
-      ${servicoLista(servs, { dono: false })}`;
+      ${servicoLista(servs, { dono: false })}
+      ${zonaExcluir("cliente", id, "Excluir cliente")}`;
   },
 
   config() {
@@ -992,8 +1036,13 @@ document.addEventListener("click", (e) => {
   if (e.target.closest("a,button,input,select,textarea,label")) return;
   const sv = e.target.closest("[data-servico]");
   if (sv) return editServico(sv.dataset.servico);
-  const tr = e.target.closest("tr[data-href]");
+  const tr = e.target.closest("[data-href]");
   if (tr) location.hash = tr.dataset.href;
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Enter" || $("#modal").classList.contains("open")) return;
+  const el = e.target.closest?.("[data-href], [data-servico]");
+  if (el && el === e.target) el.click();
 });
 
 document.addEventListener("input", (e) => {
