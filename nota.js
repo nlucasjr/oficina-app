@@ -204,11 +204,11 @@ const Nota = (() => {
     const rotulo = (x, yy, txt) => doc.texto(x, yy, txt, { size: 7.5, bold: true, c: CINZA });
     rotulo(M, y, "CLIENTE"); rotulo(col2, y, "VEÍCULO");
     let y1 = y + 16, y2 = y + 16;
-    for (const l of quebrar(d.cliente.nome || "—", colW, 11.5, true)) { doc.texto(M, y1, l, { size: 11.5, bold: true }); y1 += 15; }
+    for (const l of quebrar(d.cliente.nome || "—", colW, 11.5)) { doc.texto(M, y1, l, { size: 11.5 }); y1 += 15; }
     const valCol = (x, yy, txt) => { for (const l of quebrar(txt, colW, 9.5)) { doc.texto(x, yy, l, { size: 9.5, c: "#3d4454" }); yy += 13; } return yy; };
     if (d.cliente.telefone) y1 = valCol(M, y1, "Telefone: " + d.cliente.telefone);
     if (d.cliente.endereco) y1 = valCol(M, y1, "Endereço: " + d.cliente.endereco);
-    for (const l of quebrar(d.veiculo.nome || "—", colW, 11.5, true)) { doc.texto(col2, y2, l, { size: 11.5, bold: true }); y2 += 15; }
+    for (const l of quebrar(d.veiculo.nome || "—", colW, 11.5)) { doc.texto(col2, y2, l, { size: 11.5 }); y2 += 15; }
     if (d.veiculo.placa) y2 = valCol(col2, y2, "Placa: " + d.veiculo.placa);
     if (d.veiculo.km) y2 = valCol(col2, y2, "Quilometragem: " + d.veiculo.km);
     y = Math.max(y1, y2) + 14;
