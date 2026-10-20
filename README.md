@@ -46,7 +46,8 @@ As imagens usam dados de exemplo (fictícios).
 9. [PWA e service worker](#pwa-e-service-worker)
 10. [Versões e atualizações](#versões-e-atualizações)
 11. [Rodar, configurar e publicar](#rodar-configurar-e-publicar)
-12. [Limitações conhecidas](#limitações-conhecidas)
+12. [Testes automatizados](#testes-automatizados)
+13. [Limitações conhecidas](#limitações-conhecidas)
 
 ---
 
@@ -89,7 +90,8 @@ Regras principais:
 | Biblioteca do banco | `supabase-js` 2.117.2 (via CDN jsDelivr) | Faz login e lê/grava a tabela pelo navegador |
 | Cópia local | `localStorage` do navegador | Cache dos dados e modo local sem nuvem |
 | App no celular | Web App Manifest + Service Worker | Instalação na tela inicial e abertura rápida |
-| Hospedagem | GitHub Pages (branch `main`) | Publica o site em HTTPS a cada push |
+| Hospedagem | GitHub Pages, via GitHub Actions | Publica o site em HTTPS a cada push na `main`, só se os testes passarem |
+| Testes | Python + Playwright (Chromium), pypdf, PostgreSQL | Testam o app num navegador de verdade, a nota em PDF e o `supabase.sql` |
 
 Não há servidor próprio: o navegador fala direto com o Supabase. O GitHub Pages só entrega os arquivos.
 
@@ -112,7 +114,9 @@ oficina-app/
 ├── logo.png          Logo da barra lateral (fundo escuro).
 ├── logo-branco.png   Logo da tela de login (fundo branco).
 ├── docs/screenshots/ Imagens das telas usadas neste README.
-└── supabase.sql      Script que cria a tabela e as regras de acesso no Supabase.
+├── supabase.sql      Script que cria a tabela e as regras de acesso no Supabase.
+├── tests/            Testes automatizados (veja "Testes automatizados").
+└── .github/workflows/publicar.yml  Roda os testes e publica no GitHub Pages.
 ```
 
 ---
@@ -307,7 +311,7 @@ O app segue o **padrão de versionamento do Android**, com dois números:
 
 | | Exemplo | Para que serve |
 |---|---|---|
-| **versionName** (`VERSION_NAME`) | `1.19.0` | O número que as pessoas veem (tela Ajustes e aviso de atualização), no formato **MAIOR.CÓDIGO.CORREÇÃO**. O número do meio é **sempre igual ao versionCode**; o app monta o nome a partir dele, então os dois não descasam. |
+| **versionName** (`VERSION_NAME`) | `1.19.1` | O número que as pessoas veem (tela Ajustes e aviso de atualização), no formato **MAIOR.CÓDIGO.CORREÇÃO**. O número do meio é **sempre igual ao versionCode**; o app monta o nome a partir dele, então os dois não descasam. |
 | **versionCode** (`VERSION_CODE`) | `9` | Inteiro que sobe **1 a cada publicação**. É o número que o app compara para saber se há atualização e para a trava de compatibilidade. |
 
 Os dois ficam no início do `app.js` e no `version.json`, que também repete o versionCode no campo `versao` para que versões antigas do app (que só conhecem esse campo) recebam o aviso.
@@ -344,7 +348,7 @@ sequenceDiagram
 2. No `version.json`, coloque os mesmos valores em `versionCode`, `versionName` e `versao` (este repete o versionCode).
 3. Se a mudança altera o formato dos dados (campos que somem ou mudam de significado, tipos novos que versões antigas estragariam), iguale também `COMPAT_MINIMA` ao novo `VERSION_CODE`.
 4. Se mudou a lista de arquivos do `sw.js`, aumente o `CACHE`.
-5. Envie para a `main`. Quando o GitHub Pages publicar, quem estiver com o app aberto recebe o aviso; se `COMPAT_MINIMA` subiu, versões antigas ficam impedidas de gravar até atualizar.
+5. Rode os testes (`python tests/rodar.py`) e envie para a `main`. O GitHub roda os testes de novo e só publica se todos passarem. Quando publicar, quem estiver com o app aberto recebe o aviso; se `COMPAT_MINIMA` subiu, versões antigas ficam impedidas de gravar até atualizar.
 
 ---
 
@@ -379,7 +383,54 @@ O `supabase.sql` também apaga os restos da versão anterior do app (orçamentos
 
 ### Publicar
 
-Todo push na `main` publica automaticamente no GitHub Pages (Settings → Pages). Em um ou dois minutos o site é atualizado. Se usar o app instalado, feche e abra de novo para pegar a versão nova.
+Todo push na `main` dispara o workflow **Testes e publicação** (aba *Actions* do GitHub): primeiro rodam os testes; **só se todos passarem** o site é publicado no GitHub Pages. Se algum teste falhar, nada é publicado e o site continua na versão anterior. Leva uns 5 minutos. Se usar o app instalado, feche e abra de novo para pegar a versão nova.
+
+Para isso funcionar, o GitHub Pages precisa estar configurado para publicar pelo Actions: **Settings → Pages → Build and deployment → Source: GitHub Actions** (configuração feita uma vez só).
+
+---
+
+## Testes automatizados
+
+Os testes ficam em `tests/` e abrem o app num navegador de verdade (Chromium, pelo Playwright), no tamanho de celular e de computador, clicando e preenchendo como uma pessoa faria. Os dados de exemplo são fictícios e ficam só no navegador do teste; o Supabase não é usado.
+
+| Teste | O que confere |
+|---|---|
+| `estatico` | Arquivos citados no `index.html`, `manifest.json` e `sw.js` existem; `version.json` igual ao `app.js`; JavaScript sem erro de sintaxe |
+| `hist` | Cadastro de clientes, veículos e serviços; km atualizado; dono na época; busca; regras de exclusão |
+| `valores` | Mão de obra, peças e total; valores com vírgula; serviços antigos só com total; botão voltar do celular |
+| `secoes` | "Novo cliente" e "Novo veículo" dentro do registro de serviço; ocultas ao editar |
+| `novo` | Campos de pesquisa |
+| `lista` | Lista de serviços agrupada por mês, resumo e cartões |
+| `telas` | Listas de veículos e clientes, fichas e formulários (seções, ✕, Excluir separado) |
+| `detalhe` | Tela de detalhes do serviço: editar, excluir, voltar |
+| `ultimos` | Linha do tempo de últimos serviços no Painel |
+| `toast` | Mensagens no topo e deslizar para fechar |
+| `nota` | Nota em PDF: arquivo válido, conteúdo, acentos, várias páginas, compartilhar no celular |
+| `sobre` / `versao` | Versão em Ajustes, aviso de versão nova e trava de versão desatualizada |
+| `corrida` | Abrir e fechar janelas rápido não quebra o botão voltar |
+| `banco` | `supabase.sql` roda (e roda de novo), usuário logado lê e grava, visitante sem login não acessa nada |
+
+Os navegadores dos testes usam um relógio fixo (19/10/2026), então o resultado não muda com o dia em que rodam.
+
+### Rodar no computador
+
+Precisa do Python 3.10 ou mais novo. Uma vez só:
+
+```bash
+pip install -r tests/requirements.txt
+python -m playwright install chromium
+```
+
+Depois, sempre antes de enviar para a `main`:
+
+```bash
+python tests/rodar.py              # todos os testes (uns 2 minutos)
+python tests/rodar.py nota telas   # só alguns
+```
+
+No fim aparece um resumo com ✔/✘; o comando termina com erro se algo falhou. Os prints de tela tirados pelos testes ficam em `tests/saida/` (fora do Git). O teste `banco` precisa de um PostgreSQL (variáveis `PGHOST`, `PGUSER`, `PGPASSWORD`); sem ele, é pulado no computador, mas no GitHub roda sempre. Um teste que falha é repetido uma vez; se passar na segunda, aparece como "instável".
+
+Para atualizar os prints deste README: `python tests/gerar_prints.py . docs/screenshots`.
 
 ---
 
