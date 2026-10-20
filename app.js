@@ -19,7 +19,7 @@ const DB_KEY = "oficina_db_v1";
 //   (uma versão antiga estragaria ou apagaria dados novos), iguale-a ao
 //   VERSION_CODE; as versões mais antigas ficam impedidas de gravar até atualizar.
 const VERSION_MAJOR = 1;
-const VERSION_CODE = 15;
+const VERSION_CODE = 16;
 const VERSION_PATCH = 0;
 const VERSION_NAME = `${VERSION_MAJOR}.${VERSION_CODE}.${VERSION_PATCH}`;
 const COMPAT_MINIMA = 6;
@@ -921,7 +921,6 @@ const views = {
           <button class="btn" data-act="gerarNota" data-id="${esc(id)}">${ICO_PDF}Gerar nota (PDF)</button>${
           v ? btnServico(v.id, "+ Novo serviço neste veículo", "btn") : ""
         }</div>
-        ${s.nota ? `<p class="hint sd-nota">Nota de serviço nº ${numeroNota(s.nota)} já emitida. Gerar de novo mantém o mesmo número.</p>` : ""}
       </div>
       <div class="card sd-valores">
         <h2>Valores</h2>
@@ -1057,7 +1056,6 @@ function notFound() {
 }
 
 // ---------- nota de serviço (PDF) ----------
-const numeroNota = (n) => String(n).padStart(4, "0");
 function editOficina(after) {
   formModal(
     "Dados da oficina",
@@ -1091,25 +1089,15 @@ function gerarNota(id) {
   criarNota(s);
 }
 function criarNota(s) {
-  // número da nota: dado na primeira vez e mantido nas próximas
-  if (!s.nota) {
-    s.nota = db.servicos.reduce((m, x) => Math.max(m, num(x.nota)), 0) + 1;
-    save();
-    render();
-  }
   const v = getVeiculo(s.veiculoId),
     c = getCliente(s.clienteId);
-  const agora = new Date();
-  const p2 = (n) => String(n).padStart(2, "0");
   let blob;
   try {
     blob = Nota.gerar({
       oficina: db.config,
-      numero: s.nota,
       data: fmtDate(s.data),
-      emitida: `${p2(agora.getDate())}/${p2(agora.getMonth() + 1)}/${agora.getFullYear()} às ${p2(agora.getHours())}:${p2(agora.getMinutes())}`,
       cliente: { nome: c?.nome, telefone: c?.telefone, endereco: c?.endereco },
-      veiculo: { placa: v?.placa, nome: v ? nomeVeiculo(v) : "Veículo removido", km: temNum(s.km) ? kmFmt(s.km) : "" },
+      veiculo: { placa: v?.placa, nome: v ? nomeVeiculo(v) : "Veículo removido" },
       itens: String(s.descricao || "").split(/\r?\n/).map((l) => l.trim().replace(/^[-•*]\s*/, "")).filter(Boolean),
       maoDeObra: num(s.maoDeObra),
       pecas: num(s.pecas),
@@ -1121,7 +1109,7 @@ function criarNota(s) {
     console.error(e);
     return erro("Não foi possível gerar a nota.");
   }
-  const nome = `nota-servico-${numeroNota(s.nota)}${v?.placa ? "-" + v.placa : ""}.pdf`;
+  const nome = ["nota-servico", v?.placa, fmtDate(s.data).replace(/\//g, "-")].filter(Boolean).join("-") + ".pdf";
   entregarArquivo(blob, nome);
 }
 // no celular abre o "compartilhar" (WhatsApp, salvar em Arquivos...); no computador baixa

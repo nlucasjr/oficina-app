@@ -162,17 +162,17 @@ const Nota = (() => {
   }
 
   // ---------- a nota ----------
-  /* dados: { oficina: {nome, endereco, telefone, documento}, numero, data, emitida,
-              cliente: {nome, telefone, endereco}, veiculo: {placa, nome, km},
+  /* dados: { oficina: {nome, endereco, telefone, documento}, data: "15/10/2026",
+              cliente: {nome, telefone, endereco}, veiculo: {placa, nome},
               itens: [texto], maoDeObra, pecas, total, temDivisao, fmt: (valor) => "R$ ..." } */
   function gerar(d) {
     const doc = new Doc();
     doc.imagem = logo;
     const M = 42, L = A4.w - M * 2, DIR = A4.w - M;
-    const LARANJA = "#e8590c", ESCURO = "#201e1f", CINZA = "#6b7385", CLARO = "#f4f5f7", BORDA = "#e3e6eb";
+    const LARANJA = "#e8590c", ESCURO = "#201e1f", CINZA = "#6b7385", BORDA = "#e3e6eb", CREME = "#fff4ec";
     let y = 40;
 
-    // cabeçalho: logo, dados da oficina e quadro com número e data
+    // cabeçalho: logo, dados da oficina e quadro com a data do serviço
     const logoH = 66, logoW = logo ? (logoH * logo.w) / logo.h : 0;
     if (logo) doc.foto(M, y, logoW, logoH);
     const quadroW = 168, quadroX = DIR - quadroW;
@@ -184,15 +184,20 @@ const Nota = (() => {
     if (d.oficina.endereco) linhaInfo(d.oficina.endereco);
     if (d.oficina.telefone) linhaInfo("Telefone: " + d.oficina.telefone);
     if (d.oficina.documento) linhaInfo("CNPJ/CPF: " + d.oficina.documento);
-    doc.ret(quadroX, y, quadroW, logoH, { fill: CLARO });
-    doc.ret(quadroX, y, 4, logoH, { fill: LARANJA });
-    const qc = quadroX + quadroW / 2 + 2;
-    doc.texto(qc, y + 17, "NOTA DE SERVIÇO", { size: 9.5, bold: true, c: CINZA, alinhar: "centro" });
-    doc.texto(qc, y + 39, "Nº " + String(d.numero).padStart(4, "0"), { size: 18, bold: true, c: LARANJA, alinhar: "centro" });
-    doc.texto(qc, y + 56, "Data do serviço: " + (d.data || "—"), { size: 8.5, c: CINZA, alinhar: "centro" });
+    const qc = quadroX + quadroW / 2;
+    doc.ret(quadroX, y, quadroW, logoH, { fill: CREME });
+    doc.ret(quadroX, y + logoH - 4, quadroW, 4, { fill: LARANJA });
+    doc.texto(qc, y + 24, "DATA DO SERVIÇO", { size: 8, bold: true, c: CINZA, alinhar: "centro" });
+    doc.texto(qc, y + 48, d.data || "—", { size: 20, bold: true, c: LARANJA, alinhar: "centro" });
     y = Math.max(y + logoH, yi - 6) + 16;
-    doc.linha(M, y, DIR, y, { c: LARANJA, lw: 1.6 });
-    y += 22;
+
+    // título "Nota de serviço" abaixo do cabeçalho
+    doc.linha(M, y, DIR, y, { c: BORDA });
+    y += 14;
+    doc.ret(M, y, L, 34, { fill: CREME });
+    doc.ret(M, y, 5, 34, { fill: LARANJA });
+    doc.texto(M + 18, y + 23, "Nota de serviço", { size: 17, bold: true, c: ESCURO });
+    y += 34 + 24;
 
     // cliente e veículo
     const colW = (L - 20) / 2, col2 = M + colW + 20;
@@ -205,17 +210,12 @@ const Nota = (() => {
     if (d.cliente.endereco) y1 = valCol(M, y1, "Endereço: " + d.cliente.endereco);
     doc.texto(col2, y2, d.veiculo.placa || "—", { size: 11.5, bold: true }); y2 += 15;
     if (d.veiculo.nome) y2 = valCol(col2, y2, d.veiculo.nome);
-    if (d.veiculo.km) y2 = valCol(col2, y2, "Km no dia do serviço: " + d.veiculo.km);
     y = Math.max(y1, y2) + 14;
 
-    // serviços realizados
-    const rodapeReservado = 120;
+    // serviços realizados (continua em outra página se não couber)
+    const limite = A4.h - 50;
     const garantir = (h) => {
-      if (y + h > A4.h - rodapeReservado) {
-        doc.novaPagina();
-        y = 50;
-        return true;
-      }
+      if (y + h > limite) { doc.novaPagina(); y = 50; return true; }
       return false;
     };
     const cabecalhoTabela = (titulo) => {
@@ -238,7 +238,7 @@ const Nota = (() => {
     y += 18;
 
     // valores
-    garantir(120);
+    garantir(d.temDivisao ? 82 : 32);
     const vW = 250, vX = DIR - vW;
     const linhaValor = (rot, val) => {
       doc.texto(vX + 10, y + 15, rot, { size: 10, c: "#3d4454" });
@@ -254,24 +254,8 @@ const Nota = (() => {
     doc.ret(vX, y, vW, 32, { fill: LARANJA });
     doc.texto(vX + 12, y + 20.5, "TOTAL", { size: 11, bold: true, c: "#ffffff" });
     doc.texto(DIR - 12, y + 21.5, d.fmt(d.total), { size: 15, bold: true, c: "#ffffff", alinhar: "dir" });
-    y += 32;
 
-    // assinaturas e rodapé (sempre na última página, embaixo)
-    const yA = A4.h - 100;
-    if (y + 50 > yA) doc.novaPagina(); // sem espaço para as assinaturas: vão para uma página nova
-    const aW = (L - 40) / 2;
-    [[M, "Assinatura da oficina"], [M + aW + 40, "Assinatura do cliente"]].forEach(([x, t]) => {
-      doc.linha(x, yA, x + aW, yA, { c: "#9aa1ae" });
-      doc.texto(x + aW / 2, yA + 13, t, { size: 8.5, c: CINZA, alinhar: "centro" });
-    });
-    const totalPag = doc.paginas.length;
-    doc.paginas.forEach((ops, i) => {
-      doc.ops = ops;
-      doc.linha(M, A4.h - 42, DIR, A4.h - 42, { c: BORDA });
-      doc.texto(M, A4.h - 28, `Documento sem valor fiscal · Emitida em ${d.emitida}`, { size: 7.5, c: CINZA });
-      if (totalPag > 1) doc.texto(DIR, A4.h - 28, `Página ${i + 1} de ${totalPag}`, { size: 7.5, c: CINZA, alinhar: "dir" });
-    });
-    const bytes = doc.arquivo(`Nota de serviço ${String(d.numero).padStart(4, "0")}`);
+    const bytes = doc.arquivo(`Nota de serviço ${d.data || ""}`.trim());
     return new Blob([bytes], { type: "application/pdf" });
   }
 

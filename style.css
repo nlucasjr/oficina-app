@@ -241,7 +241,6 @@ input.maiusculas::placeholder { text-transform: none; }
 .sd-aviso { margin: -8px 4px 0; }
 
 .ico-btn { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
-.sd-nota { margin: 10px 0 0; }
 .falta { color: var(--warn); font-weight: 500; }
 @media (max-width: 800px) {
   .sv-resumo { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 14px; }
