@@ -52,6 +52,11 @@ def main():
             seg += seg2
             if not ok:
                 print(texto2)
+        if not ok and os.environ.get('GITHUB_ACTIONS'):
+            # aparece como aviso no resumo da execução no GitHub
+            falhas_txt = [l for l in (texto2 + '\n' + texto).splitlines() if l.startswith(('FALHOU', 'Traceback', 'playwright.', 'TimeoutError', 'AssertionError')) or 'Error' in l[:40]]
+            msg = ' | '.join(dict.fromkeys(falhas_txt))[:1500].replace('%', '%25').replace('\r', '').replace('\n', ' ')
+            print(f'::error title=Teste {nome} falhou::{msg or "veja o log"}', flush=True)
         aprovados = texto.count('\nok   ') + texto.startswith('ok   ')
         pulado = 'pulado:' in texto
         resultados.append((nome, ok, instavel, pulado, seg))
