@@ -4,10 +4,10 @@
    - Biblioteca do Supabase (CDN): fica guardada depois do primeiro uso.
    - Supabase (login e dados): nunca passa pelo cache, vai sempre direto para a rede.
    Ao mudar a lista de arquivos ou as versões das bibliotecas, aumente o número em CACHE. */
-const CACHE = 'oficina-v4';
+const CACHE = 'oficina-v5';
 
 const SHELL = [
-  './', 'index.html', 'style.css', 'config.js', 'app.js', 'cloud.js',
+  './', 'index.html', 'style.css', 'config.js', 'app.js', 'nota.js', 'cloud.js',
   'logo.png', 'logo-branco.png', 'manifest.json',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',
 ];

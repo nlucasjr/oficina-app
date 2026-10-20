@@ -19,7 +19,7 @@ const DB_KEY = "oficina_db_v1";
 //   (uma versão antiga estragaria ou apagaria dados novos), iguale-a ao
 //   VERSION_CODE; as versões mais antigas ficam impedidas de gravar até atualizar.
 const VERSION_MAJOR = 1;
-const VERSION_CODE = 14;
+const VERSION_CODE = 15;
 const VERSION_PATCH = 0;
 const VERSION_NAME = `${VERSION_MAJOR}.${VERSION_CODE}.${VERSION_PATCH}`;
 const COMPAT_MINIMA = 6;
@@ -713,6 +713,7 @@ const ICO_DATA = `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5
 const ICO_SERV = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L4 17l3 3 5.3-5.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.5-.5-.5-2.5z"/></svg>`;
 const ICO_CARRO = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 16V11l2-5h10l2 5v5"/><path d="M3 16h18v3H3zM5 11h14"/><circle cx="7.5" cy="13.5" r=".6"/><circle cx="16.5" cy="13.5" r=".6"/></svg>`;
 const ICO_SETA = `<svg class="item-seta" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>`;
+const ICO_PDF = `<svg class="ico-btn" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>`;
 const chip = (ico, html) => (html ? `<span class="sv-chip">${ico}${html}</span>` : "");
 const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
 const iniciais = (nome) =>
@@ -895,6 +896,7 @@ const views = {
   servico([id]) {
     const s = getServico(id);
     if (!s) return notFound();
+    Nota.preparar(); // deixa o logo pronto para a nota
     const v = getVeiculo(s.veiculoId),
       c = getCliente(s.clienteId),
       donoAtual = v && getCliente(v.clienteId);
@@ -915,9 +917,11 @@ const views = {
           <div><span class="ficha-rot">${ICO_TEL}Telefone</span>${telLink(c?.telefone)}</div>
           ${criado ? `<div><span class="ficha-rot">${ICO_DATA}Registrado em</span>${fmtDate(criado)}</div>` : ""}
         </div>
-        <div class="ficha-acoes"><button class="btn primary" data-act="editServico" data-id="${esc(id)}">Editar serviço</button>${
+        <div class="ficha-acoes"><button class="btn primary" data-act="editServico" data-id="${esc(id)}">Editar serviço</button>
+          <button class="btn" data-act="gerarNota" data-id="${esc(id)}">${ICO_PDF}Gerar nota (PDF)</button>${
           v ? btnServico(v.id, "+ Novo serviço neste veículo", "btn") : ""
         }</div>
+        ${s.nota ? `<p class="hint sd-nota">Nota de serviço nº ${numeroNota(s.nota)} já emitida. Gerar de novo mantém o mesmo número.</p>` : ""}
       </div>
       <div class="card sd-valores">
         <h2>Valores</h2>
@@ -1017,7 +1021,18 @@ const views = {
   },
 
   config() {
+    const o = db.config;
     return `<div class="page-head"><h1>Ajustes</h1></div>
+      <div class="card"><div class="secao-head" style="margin-top:0"><h2>Dados da oficina</h2>
+          <button class="btn sm" data-act="editOficina">Editar</button></div>
+        <p class="muted" style="margin-top:0">Aparecem no topo da nota de serviço em PDF, junto com o logo.</p>
+        <div class="ficha-dados oficina-dados">
+          <div><span class="ficha-rot">Nome</span>${esc(o.nome) || "—"}</div>
+          <div><span class="ficha-rot">${ICO_LOCAL}Endereço</span>${esc(o.endereco) || '<span class="falta">Não informado</span>'}</div>
+          <div><span class="ficha-rot">${ICO_TEL}Telefone</span>${esc(o.telefone) || '<span class="falta">Não informado</span>'}</div>
+          ${o.documento ? `<div><span class="ficha-rot">CNPJ/CPF</span>${esc(o.documento)}</div>` : ""}
+        </div>
+      </div>
       <div class="card"><h2>Backup dos dados</h2>
         <p class="muted">${
           window.cloud?.on
@@ -1041,6 +1056,99 @@ function notFound() {
   return `<div class="card empty">Registro não encontrado. <a href="#painel">Voltar ao painel</a></div>`;
 }
 
+// ---------- nota de serviço (PDF) ----------
+const numeroNota = (n) => String(n).padStart(4, "0");
+function editOficina(after) {
+  formModal(
+    "Dados da oficina",
+    [
+      { k: "nome", label: "Nome da oficina", required: true, full: true, palavras: true },
+      { k: "endereco", label: "Endereço", full: true, palavras: true, ph: "Rua, número, bairro e cidade" },
+      { k: "telefone", label: "Telefone / WhatsApp", type: "tel", metade: true, ph: "(67) 99999-0000" },
+      { k: "documento", label: "CNPJ ou CPF (opcional)", metade: true },
+    ],
+    db.config,
+    (vals) => {
+      Object.assign(db.config, vals);
+      save();
+      toast("Dados da oficina salvos");
+      after ? after() : render();
+    },
+  );
+}
+function gerarNota(id) {
+  const s = getServico(id);
+  if (!s) return;
+  const o = db.config;
+  if (!o.endereco || !o.telefone) {
+    toast("Preencha o endereço e o telefone da oficina para a nota", "erro");
+    return editOficina(() => {
+      render();
+      if (db.config.endereco && db.config.telefone) gerarNota(id);
+    });
+  }
+  if (!Nota.pronto()) return Nota.preparar().then(() => criarNota(s));
+  criarNota(s);
+}
+function criarNota(s) {
+  // número da nota: dado na primeira vez e mantido nas próximas
+  if (!s.nota) {
+    s.nota = db.servicos.reduce((m, x) => Math.max(m, num(x.nota)), 0) + 1;
+    save();
+    render();
+  }
+  const v = getVeiculo(s.veiculoId),
+    c = getCliente(s.clienteId);
+  const agora = new Date();
+  const p2 = (n) => String(n).padStart(2, "0");
+  let blob;
+  try {
+    blob = Nota.gerar({
+      oficina: db.config,
+      numero: s.nota,
+      data: fmtDate(s.data),
+      emitida: `${p2(agora.getDate())}/${p2(agora.getMonth() + 1)}/${agora.getFullYear()} às ${p2(agora.getHours())}:${p2(agora.getMinutes())}`,
+      cliente: { nome: c?.nome, telefone: c?.telefone, endereco: c?.endereco },
+      veiculo: { placa: v?.placa, nome: v ? nomeVeiculo(v) : "Veículo removido", km: temNum(s.km) ? kmFmt(s.km) : "" },
+      itens: String(s.descricao || "").split(/\r?\n/).map((l) => l.trim().replace(/^[-•*]\s*/, "")).filter(Boolean),
+      maoDeObra: num(s.maoDeObra),
+      pecas: num(s.pecas),
+      total: num(s.valor),
+      temDivisao: temDivisao(s),
+      fmt: brl,
+    });
+  } catch (e) {
+    console.error(e);
+    return erro("Não foi possível gerar a nota.");
+  }
+  const nome = `nota-servico-${numeroNota(s.nota)}${v?.placa ? "-" + v.placa : ""}.pdf`;
+  entregarArquivo(blob, nome);
+}
+// no celular abre o "compartilhar" (WhatsApp, salvar em Arquivos...); no computador baixa
+function entregarArquivo(blob, nome) {
+  const baixar = () => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = nome;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    toast("Nota gerada: " + nome);
+  };
+  let arquivo = null;
+  try {
+    arquivo = new File([blob], nome, { type: "application/pdf" });
+  } catch {}
+  const celular = matchMedia("(pointer: coarse)").matches;
+  if (arquivo && celular && navigator.canShare?.({ files: [arquivo] })) {
+    navigator.share({ files: [arquivo], title: nome }).catch((e) => {
+      if (e?.name !== "AbortError") baixar();
+    });
+  } else baixar();
+}
+
 // ---------- navegação ----------
 let rotaAtual = location.hash,
   rotaAnterior = null; // tela de onde se veio dentro do app (null ao abrir direto pelo link)
@@ -1053,6 +1161,8 @@ function sair(padrao) {
 // ---------- ações ----------
 const actions = {
   editServico: (b) => editServico(b.dataset.id),
+  gerarNota: (b) => gerarNota(b.dataset.id),
+  editOficina: () => editOficina(),
   voltar: (b) => sair(b.getAttribute("href") || "#painel"),
   novoCliente: () => editCliente(null),
   editCliente: (b) => editCliente(b.dataset.id),
