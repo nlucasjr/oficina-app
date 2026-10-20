@@ -15,7 +15,7 @@ permissions:
 jobs:
   testes:
     name: Testes
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     services:
       postgres:
@@ -30,9 +30,9 @@ jobs:
       PGUSER: postgres
       PGPASSWORD: teste
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
@@ -50,7 +50,7 @@ jobs:
 
       - name: Guardar prints dos testes (se falhar)
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: prints-dos-testes
           path: tests/saida/
@@ -60,7 +60,7 @@ jobs:
     name: Publicar no GitHub Pages
     needs: testes
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       pages: write
       id-token: write
@@ -71,7 +71,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Separar só os arquivos do app
         run: |
