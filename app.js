@@ -19,7 +19,7 @@ const DB_KEY = "oficina_db_v1";
 //   (uma versão antiga estragaria ou apagaria dados novos), iguale-a ao
 //   VERSION_CODE; as versões mais antigas ficam impedidas de gravar até atualizar.
 const VERSION_MAJOR = 1;
-const VERSION_CODE = 18;
+const VERSION_CODE = 19;
 const VERSION_PATCH = 0;
 const VERSION_NAME = `${VERSION_MAJOR}.${VERSION_CODE}.${VERSION_PATCH}`;
 const COMPAT_MINIMA = 6;
@@ -198,7 +198,8 @@ function fecharToast(dx = 0) {
   t.addEventListener("pointerup", soltar);
   t.addEventListener("pointercancel", soltar);
 })();
-const plate = (p) => (p ? `<span class="plate">${esc(p)}</span>` : "");
+const porVeiculo = (a, b) => (nomeVeiculo(a) || "").localeCompare(nomeVeiculo(b) || "", "pt-BR") || String(a.placa).localeCompare(String(b.placa));
+const plate = (p, cls = "") => (p ? `<span class="plate ${cls}">${esc(p)}</span>` : "");
 const telLink = (t) =>
   t ? `<a href="tel:${esc(String(t).replace(/[^\d+]/g, ""))}">${esc(t)}</a>` : "—";
 
@@ -461,10 +462,10 @@ const servicoFields = (novosCadastros = true) => [
       { v: "", l: "Escolha o veículo" },
       ...db.veiculos
         .slice()
-        .sort((a, b) => a.placa.localeCompare(b.placa))
+        .sort(porVeiculo)
         .map((v) => ({
           v: v.id,
-          l: [v.placa, nomeVeiculo(v), getCliente(v.clienteId)?.nome].filter(Boolean).join(" · "),
+          l: [nomeVeiculo(v) || "Veículo", v.placa, getCliente(v.clienteId)?.nome].filter(Boolean).join(" · "),
         })),
     ],
     afterHTML: novosCadastros ? novosCadastrosHTML() : "",
@@ -734,7 +735,7 @@ function veiculoItem(v, { dono = true, acao = "" } = {}) {
   return `<div class="item" data-href="#veiculo/${esc(v.id)}" role="link" tabindex="0">
     <span class="item-ico">${ICO_CARRO}</span>
     <div class="item-corpo">
-      <div class="item-titulo">${plate(v.placa)} <span>${esc(nomeVeiculo(v)) || "—"}</span></div>
+      <div class="item-titulo"><span>${esc(nomeVeiculo(v)) || "Veículo"}</span> ${plate(v.placa, "sm")}</div>
       <div class="sv-meta">
         ${dono ? chip(ICO_DONO, esc(c?.nome || "Sem dono")) : ""}
         ${chip(ICO_KM, kmFmt(v.km))}
@@ -759,7 +760,7 @@ function clienteItem(c) {
         ${chip(ICO_CARRO, plural(veics.length, "veículo", "veículos"))}
         ${chip(ICO_SERV, plural(nServ, "serviço", "serviços"))}
       </div>
-      ${veics.length ? `<div class="item-placas">${veics.map((v) => plate(v.placa)).join("")}</div>` : ""}
+      ${veics.length ? `<div class="item-placas">${veics.map((v) => `<span class="veic-tag">${esc(nomeVeiculo(v)) || "Veículo"} ${plate(v.placa, "sm")}</span>`).join("")}</div>` : ""}
     </div>
     ${ICO_SETA}
   </div>`;
@@ -791,7 +792,7 @@ function servicoCartao(s, { dono = true, veiculo = true, donoAtual = null } = {}
       dia ? `<b>${dia}</b><span>${MESES_CURTOS[+mes - 1] || ""}</span>` : "<span>—</span>"
     }</div>
     <div class="sv-corpo">
-      ${veiculo ? `<div class="sv-veiculo">${v ? `${plate(v.placa)} <span>${esc(nomeVeiculo(v))}</span>` : `<span class="muted">Veículo removido</span>`}</div>` : ""}
+      ${veiculo ? `<div class="sv-veiculo">${v ? `<span>${esc(nomeVeiculo(v)) || "Veículo"}</span> ${plate(v.placa, "sm")}` : `<span class="muted">Veículo removido</span>`}</div>` : ""}
       <div class="sv-desc clamp">${esc(s.descricao)}</div>
       ${meta ? `<div class="sv-meta">${meta}</div>` : ""}
     </div>
@@ -844,8 +845,8 @@ function ultimosServicos(list) {
         c = getCliente(s.clienteId) || getCliente(v?.clienteId);
       return `<div class="tl-item click" data-servico="${esc(s.id)}">
         <div class="ul-cliente strong">${esc(c?.nome || "—")}</div>
-        <div class="ul-placa">${v ? plate(v.placa) : "—"}</div>
-        <div class="ul-modelo muted">${esc(v ? v.modelo || "—" : "Veículo removido")}</div>
+        <div class="ul-placa">${v ? plate(v.placa, "sm") : "—"}</div>
+        <div class="ul-modelo">${esc(v ? v.modelo || "—" : "Veículo removido")}</div>
         <div class="ul-total"><b>${valorOuTraco(s.valor)}</b></div>
       </div>`;
     })
@@ -939,7 +940,7 @@ const views = {
     const busca = norm(q.q);
     const list = db.veiculos
       .filter((v) => !busca || norm(`${v.placa} ${nomeVeiculo(v)} ${getCliente(v.clienteId)?.nome}`).includes(busca))
-      .sort((a, b) => a.placa.localeCompare(b.placa));
+      .sort(porVeiculo);
     return `<div class="page-head"><h1>Veículos</h1><button class="btn primary" data-act="novoVeiculo">+ Novo veículo</button></div>
       ${campoBusca(q.q)}
       ${
@@ -960,7 +961,7 @@ const views = {
       <div class="card ficha">
         <div class="ficha-topo">
           <span class="item-ico grande">${ICO_CARRO}</span>
-          <div class="ficha-nome">${plate(v.placa)}<h1>${esc(nomeVeiculo(v)) || "Veículo"}</h1></div>
+          <div class="ficha-nome"><h1>${esc(nomeVeiculo(v)) || "Veículo"}</h1>${plate(v.placa, "sm")}</div>
         </div>
         <div class="ficha-dados">
           <div><span class="ficha-rot">${ICO_DONO}Dono atual</span>${c ? `<a href="#cliente/${c.id}">${esc(c.nome)}</a>` : "—"}</div>
@@ -994,7 +995,7 @@ const views = {
   cliente([id]) {
     const c = getCliente(id);
     if (!c) return notFound();
-    const veics = db.veiculos.filter((v) => v.clienteId === id).sort((a, b) => a.placa.localeCompare(b.placa));
+    const veics = db.veiculos.filter((v) => v.clienteId === id).sort(porVeiculo);
     const servs = db.servicos.filter((s) => s.clienteId === id);
     return `<a href="#clientes" class="voltar">← Clientes</a>
       <div class="card ficha">
