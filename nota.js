@@ -208,8 +208,8 @@ const Nota = (() => {
     const valCol = (x, yy, txt) => { for (const l of quebrar(txt, colW, 9.5)) { doc.texto(x, yy, l, { size: 9.5, c: "#3d4454" }); yy += 13; } return yy; };
     if (d.cliente.telefone) y1 = valCol(M, y1, "Telefone: " + d.cliente.telefone);
     if (d.cliente.endereco) y1 = valCol(M, y1, "Endereço: " + d.cliente.endereco);
-    doc.texto(col2, y2, d.veiculo.placa || "—", { size: 11.5, bold: true }); y2 += 15;
-    if (d.veiculo.nome) y2 = valCol(col2, y2, d.veiculo.nome);
+    for (const l of quebrar(d.veiculo.nome || "—", colW, 11.5, true)) { doc.texto(col2, y2, l, { size: 11.5, bold: true }); y2 += 15; }
+    if (d.veiculo.placa) y2 = valCol(col2, y2, "Placa: " + d.veiculo.placa);
     if (d.veiculo.km) y2 = valCol(col2, y2, "Quilometragem: " + d.veiculo.km);
     y = Math.max(y1, y2) + 14;
 
