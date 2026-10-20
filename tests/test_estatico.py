@@ -36,10 +36,11 @@ check('sw.js: bibliotecas da CDN iguais às do index.html', sorted(cdn_html) == 
 # versão
 app = ler('app.js')
 num = lambda nome: int(re.search(rf'const {nome} = (\d+);', app).group(1))
-major, code, patch, compat = num('VERSION_MAJOR'), num('VERSION_CODE'), num('VERSION_PATCH'), num('COMPAT_MINIMA')
+code, compat = num('VERSION_CODE'), num('COMPAT_MINIMA')
+nome_esperado = f'{code // 100}.{code // 10 % 10}.{code % 10}'
 vj = json.loads(ler('version.json'))
-check('version.json igual ao app.js', vj.get('versionCode') == code and vj.get('versao') == code and vj.get('versionName') == f'{major}.{code}.{patch}',
-      (vj, f'{major}.{code}.{patch}'))
+check('version.json igual ao app.js (nome = dígitos do código)', vj.get('versionCode') == code and vj.get('versao') == code and vj.get('versionName') == nome_esperado,
+      (vj, nome_esperado))
 check('versão mínima compatível não passa da versão atual', compat <= code, (compat, code))
 
 # sintaxe do JavaScript (precisa do Node; sem ele, pula)

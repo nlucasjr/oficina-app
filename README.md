@@ -307,16 +307,25 @@ erDiagram
 
 ## Versões e atualizações
 
-O app segue o **padrão de versionamento do Android**, com dois números:
+O app usa dois números:
 
 | | Exemplo | Para que serve |
 |---|---|---|
-| **versionName** (`VERSION_NAME`) | `1.19.1` | O número que as pessoas veem (tela Ajustes e aviso de atualização), no formato **MAIOR.CÓDIGO.CORREÇÃO**. O número do meio é **sempre igual ao versionCode**; o app monta o nome a partir dele, então os dois não descasam. |
-| **versionCode** (`VERSION_CODE`) | `9` | Inteiro que sobe **1 a cada publicação**. É o número que o app compara para saber se há atualização e para a trava de compatibilidade. |
+| **versionCode** (`VERSION_CODE`) | `119` | Inteiro que sobe **1 a cada publicação do app**. É o número que o app compara para saber se há atualização e para a trava de compatibilidade. |
+| **versionName** (`VERSION_NAME`) | `1.1.9` | O número que as pessoas veem (tela Ajustes e aviso de atualização). É formado pelos **dígitos do versionCode**; o app monta o nome a partir dele, então os dois não descasam. |
+
+| versionCode | versionName |
+|---|---|
+| 119 | 1.1.9 |
+| 120 | 1.2.0 |
+| 199 | 1.9.9 |
+| 200 | 2.0.0 |
+
+Mudanças que **não alteram o app** (README, prints, testes) **não mudam a versão**, e ninguém recebe aviso.
 
 Os dois ficam no início do `app.js` e no `version.json`, que também repete o versionCode no campo `versao` para que versões antigas do app (que só conhecem esse campo) recebam o aviso.
 
-Histórico: até o versionCode 7 o app usava só um número inteiro. O versionCode 8 chegou a ser publicado como 1.7.1 e foi renomeado para **1.8.0**, para o número do meio casar com o código.
+Histórico: até o versionCode 7 o app usava só um número inteiro. Do 8 ao 19 o nome era MAIOR.CÓDIGO.CORREÇÃO (ex.: código 19 = 1.19.1). A partir daí o código pulou para **119**, para o nome passar a ser formado pelos dígitos do código (1.1.9) sem repetir nomes já usados.
 
 Como a publicação no GitHub Pages pode atrasar, e aparelhos podem ficar com o app antigo aberto, o app se protege contra versões desatualizadas de duas formas.
 
@@ -341,10 +350,7 @@ sequenceDiagram
 
 ### Como publicar uma versão nova
 
-1. No `app.js`:
-   - **nova publicação do app** (qualquer mudança no app): `VERSION_CODE` + 1 e `VERSION_PATCH` volta a 0 (ex.: 1.18.0 → **1.19.0**);
-   - **mudança que não exige atualizar o app** (README, prints, testes): só `VERSION_PATCH` + 1 (ex.: 1.8.0 → **1.8.1**); o versionCode não muda, então ninguém recebe aviso;
-   - **mudança muito grande**: `VERSION_MAJOR` + 1 (ex.: 1.12.0 → **2.13.0**; o código continua subindo).
+1. No `app.js`, some 1 ao `VERSION_CODE` (ex.: 119 → **120**, que aparece como 1.2.0). Só para mudanças no app; README e testes não mudam a versão.
 2. No `version.json`, coloque os mesmos valores em `versionCode`, `versionName` e `versao` (este repete o versionCode).
 3. Se a mudança altera o formato dos dados (campos que somem ou mudam de significado, tipos novos que versões antigas estragariam), iguale também `COMPAT_MINIMA` ao novo `VERSION_CODE`.
 4. Se mudou a lista de arquivos do `sw.js`, aumente o `CACHE`.
