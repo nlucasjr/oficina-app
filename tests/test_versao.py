@@ -98,7 +98,7 @@ with sync_playwright() as p:
     pg, errs = pagina(b)
     pg.evaluate(FAKE, ROWS + [{'tipo': 'sistema', 'id': 'versao', 'data': {'minima': COMPAT}}]); pg.evaluate(INICIAR)
     check('banco com a versão mínima igual: não bloqueia', pg.locator('#bloqueio').count() == 0)
-    pg.evaluate("__tab.set('sistema|versao', { tipo: 'sistema', id: 'versao', data: { minima: 99 } })")  # outra pessoa abriu a versão nova
+    pg.evaluate("__tab.set('sistema|versao', { tipo: 'sistema', id: 'versao', data: { minima: %d } })" % (APP + 1))  # outra pessoa abriu a versão nova
     pg.click('[data-act="novoCliente"]'); pg.wait_for_selector('#mf')
     pg.fill('#mf [name="nome"]', 'Maria'); pg.fill('#mf [name="telefone"]', '67 98888'); pg.click('#mf .btn.primary')
     pg.wait_for_timeout(900)
@@ -107,7 +107,7 @@ with sync_playwright() as p:
     # atualização automática também percebe
     pg, errs = pagina(b)
     pg.evaluate(FAKE, ROWS); pg.evaluate(INICIAR)
-    pg.evaluate("__tab.set('sistema|versao', { tipo: 'sistema', id: 'versao', data: { minima: 99 } })")
+    pg.evaluate("__tab.set('sistema|versao', { tipo: 'sistema', id: 'versao', data: { minima: %d } })" % (APP + 1))
     pg.evaluate('cloud.refresh()'); pg.wait_for_timeout(300)
     check('atualização automática também bloqueia', pg.locator('#bloqueio').count() == 1)
     check('sem erros de JavaScript', not errs, errs)
