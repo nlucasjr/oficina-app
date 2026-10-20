@@ -84,6 +84,14 @@ with sync_playwright() as p:
         check(f'nota contém "{parte}"', parte in txt.replace('\xa0', ' '))
     check('veículo: marca/modelo antes da placa', 0 <= txt.find('Volkswagen Gol 1.0') < txt.find('Placa: ABC1D23'), txt[:400])
     check('marcador "-" do texto vira item da lista (sem "- " sobrando)', '- Revisão' not in txt)
+    fontes = {}
+    def _fonte(t, cm, tm, fd, fs):
+        if fd and t.strip(): fontes.setdefault(t.strip(), fd.get('/BaseFont'))
+    from pypdf import PdfReader
+    PdfReader(path).pages[0].extract_text(visitor_text=_fonte)
+    check('nome do cliente sem negrito', fontes.get('João Pereira') == '/Helvetica', fontes.get('João Pereira'))
+    check('marca/modelo do veículo sem negrito', fontes.get('Volkswagen Gol 1.0') == '/Helvetica', fontes.get('Volkswagen Gol 1.0'))
+    check('rótulos CLIENTE e VEÍCULO continuam em negrito', fontes.get('CLIENTE') == fontes.get('VEÍCULO') == '/Helvetica-Bold', (fontes.get('CLIENTE'), fontes.get('VEÍCULO')))
     imgs = imagens_jpeg(path)
     check('logo da oficina embutido como imagem', len(imgs) == 1, imgs)
     renderizar(path, 'nota-s1', 80)

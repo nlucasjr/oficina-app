@@ -17,7 +17,7 @@ const DB_KEY = "oficina_db_v1";
 // COMPAT_MINIMA (um versionCode): se a mudança altera o formato dos dados
 //   (uma versão antiga estragaria ou apagaria dados novos), iguale-a ao
 //   VERSION_CODE; as versões mais antigas ficam impedidas de gravar até atualizar.
-const VERSION_CODE = 119;
+const VERSION_CODE = 120;
 const nomeDaVersao = (c) => `${Math.floor(c / 100)}.${Math.floor(c / 10) % 10}.${c % 10}`;
 const VERSION_NAME = nomeDaVersao(VERSION_CODE);
 const COMPAT_MINIMA = 6;
