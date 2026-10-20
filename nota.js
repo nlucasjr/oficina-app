@@ -163,7 +163,7 @@ const Nota = (() => {
 
   // ---------- a nota ----------
   /* dados: { oficina: {nome, endereco, telefone, documento}, data: "15/10/2026",
-              cliente: {nome, telefone, endereco}, veiculo: {placa, nome},
+              cliente: {nome, telefone, endereco}, veiculo: {placa, nome, km},
               itens: [texto], maoDeObra, pecas, total, temDivisao, fmt: (valor) => "R$ ..." } */
   function gerar(d) {
     const doc = new Doc();
@@ -210,6 +210,7 @@ const Nota = (() => {
     if (d.cliente.endereco) y1 = valCol(M, y1, "Endereço: " + d.cliente.endereco);
     doc.texto(col2, y2, d.veiculo.placa || "—", { size: 11.5, bold: true }); y2 += 15;
     if (d.veiculo.nome) y2 = valCol(col2, y2, d.veiculo.nome);
+    if (d.veiculo.km) y2 = valCol(col2, y2, "Quilometragem: " + d.veiculo.km);
     y = Math.max(y1, y2) + 14;
 
     // serviços realizados (continua em outra página se não couber)

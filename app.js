@@ -19,7 +19,7 @@ const DB_KEY = "oficina_db_v1";
 //   (uma versão antiga estragaria ou apagaria dados novos), iguale-a ao
 //   VERSION_CODE; as versões mais antigas ficam impedidas de gravar até atualizar.
 const VERSION_MAJOR = 1;
-const VERSION_CODE = 16;
+const VERSION_CODE = 17;
 const VERSION_PATCH = 0;
 const VERSION_NAME = `${VERSION_MAJOR}.${VERSION_CODE}.${VERSION_PATCH}`;
 const COMPAT_MINIMA = 6;
@@ -1097,7 +1097,7 @@ function criarNota(s) {
       oficina: db.config,
       data: fmtDate(s.data),
       cliente: { nome: c?.nome, telefone: c?.telefone, endereco: c?.endereco },
-      veiculo: { placa: v?.placa, nome: v ? nomeVeiculo(v) : "Veículo removido" },
+      veiculo: { placa: v?.placa, nome: v ? nomeVeiculo(v) : "Veículo removido", km: temNum(s.km) ? kmFmt(s.km) : "" },
       itens: String(s.descricao || "").split(/\r?\n/).map((l) => l.trim().replace(/^[-•*]\s*/, "")).filter(Boolean),
       maoDeObra: num(s.maoDeObra),
       pecas: num(s.pecas),
